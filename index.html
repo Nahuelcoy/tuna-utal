@@ -235,6 +235,17 @@ table.kt .num{text-align:right}
 .hdr-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
 .hdr-btn .badge{top:-5px;left:auto;right:-5px}
 .seg.seg2{grid-template-columns:1fr 1fr}
+.rep-row{display:flex;gap:10px;align-items:flex-end}
+.rep-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.rep-row .rep-n{margin-bottom:10px}
+.rep-mv{display:flex;gap:4px;flex:none}
+.rep-mv .btn{min-height:44px;padding:6px 10px}
+.rep-l{font-size:12px!important;font-weight:500!important;color:var(--muted)}
+.rep-view{display:flex;flex-direction:column;gap:7px}
+.rep-g{margin:8px 0 0;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rep-item{display:flex;align-items:center;gap:10px;font-size:14px}
+.rep-t{flex:1;min-width:0;overflow-wrap:anywhere}
+.rep-r{font-size:12px;color:var(--muted);white-space:nowrap}
 .person{flex-wrap:wrap;row-gap:8px}
 .person .info{flex:1 1 calc(100% - 120px)}
 .person select,.person .btn{flex:none}
@@ -274,6 +285,23 @@ const ESTADOS_CONTRATO = {cotizado:"Cotizado",confirmado:"Confirmado",realizado:
 const CONCEPTOS = ["Transporte","Alimentación","Vestuario","Cuerdas e instrumentos","Equipo de sonido","Comisión","Otro"];
 const DENOMS = [20000,10000,5000,2000,1000,500,100,50,10]; // billetes y monedas chilenas
 const MESES_L = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const CANCIONES = [["agua-del-pozo","Agua del pozo","Pasodoble"],["amarraditos","Amarraditos","Vals"],["amor-de-loca-juventud","Amor de loca juventud","Bolero"],["anoche-yo-me-enamore","Anoche, yo me enamoré","Balada"],["ay-corazon","Ay corazon","Tonada"],["barrio-brujo","Barrio brujo","Pasodoble"],["callejon-de-un-solo-cano","Callejón de un solo caño","Vals"],["carinito","Cariñito",""],["chipi-chipi","Chipi chipi","Foxtrot"],["clavelitos","Clavelitos","Vals"],["como-fue","Como fue","Bolero"],["compostelana","Compostelana","Pasodoble"],["contigo","Contigo",""],["creo-estar-sonando","Creo estar soñando","Foxtrot"],["cuerdas-de-mi-guitarra","Cuerdas de mi guitarra","Pasodoble"],["curico","Curicó","Pasodoble"],["desiderio","Desiderio","Pasodoble"],["despues-de-un-te-quiero","Después de un te quiero","Tonada"],["disculpe-usted","Disculpe usted","Cha cha chá"],["doce-cascabeles","Doce cascabeles","Pasodoble"],["don-quijote","Don quijote","Pasodoble"],["el-beso","El beso","Pasodoble"],["el-calor-del-amor-en-un-bar","El calor del amor en un bar","Pasodoble"],["el-manolo","El manolo","Pasodoble"],["el-milagro-de-tus-ojos","El milagro de tus ojos","Cha cha chá"],["el-parque","El parque","Vals"],["el-parrandero","El parrandero","Pasodoble"],["el-reloj","El reloj","Bolero"],["el-vampiro","El vampiro","Pasodoble"],["elsa","Elsa","Bolero"],["en-la-huella-de-tu-recuerdo","En la huella de tu recuerdo","Tonada"],["en-mi-viejo-san-juan","En mi viejo san juan","Bolero"],["enamorate-de-ti","Enamorate de tí","Bolero"],["es-mi-madre","Es mi madre","Bolero"],["estando-en-otras-tierras","Estando en otras tierras","Pasodoble"],["fonseca","Fonseca","Vals"],["hasta-donde-te-quiero","Hasta donde te quiero","Bolero"],["idilio","Idilio",""],["isa-candidito","Isa candidito","Isa"],["la-barca","La barca","Bolero"],["la-cigarra","La cigarra","Huapango"],["la-copla-del-rondador","La copla del rondador","Pasodoble"],["la-danza-de-las-libelulas","La danza de las libélulas",""],["la-era-esta-pariendo-un-corazon","La era esta pariendo un corazón",""],["la-media-vuelta","La media vuelta","Bolero"],["la-novia-del-pescador","La novia del pescador","Pasodoble"],["las-cintas-de-mi-capa","Las cintas de mi capa","Pasodoble"],["las-dos-puntas","Las dos puntas","Tonada"],["las-mananitas","Las mañanitas",""],["lejos-del-amor","Lejos del amor",""],["loco","Loco",""],["los-pintores-de-vitoria","Los pintores de vitoria","Pasodoble"],["luna-de-espana","Luna de españa","Pasodoble"],["me-estoy-enamorando","Me estoy enamorando","Bolero"],["me-quede-sin-ti","Me quedé sin ti","Cabales"],["mejillones","Mejillones","Foxtrot"],["mi-cueca-chilena","Mi cueca chilena","Cueca"],["mi-tierra-andalucia","Mi tierra andalucía","Pasodoble"],["mix-chachacha","Mix chachacha","Cha cha chá"],["mix-cumbias","Mix cumbias","Cumbia"],["mix-de-boleros-dos-y-cuatro","Mix de boleros (dos y cuatro)","Bolero"],["mix-de-boleros-3","Mix de boleros 3","Bolero"],["mix-de-pasodobles-1","Mix de pasodobles 1","Pasodoble"],["mix-de-pasodobles-2-la-laguna-la-novia-del-pescador","Mix de pasodobles 2 (la laguna – la novia del pescador)","Pasodoble"],["mix-de-vals","Mix de vals","Vals"],["mix-isas","Mix isas","Isa"],["mix-tendencias","Mix tendencias",""],["moliendo-cafe","Moliendo cafe","Rumba"],["morena-de-mi-copla","Morena de mi copla","Pasodoble"],["motivos","Motivos",""],["nube-gris","Nube gris","Vals"],["piel-canela","Piel canela","Cha cha chá"],["popurri-mexicano","Popurrí mexicano","Pasodoble"],["romances-del-mediterraneo","Romances del mediterraneo","Pasodoble"],["rondalla","Rondalla","Vals"],["san-cayetano","San cayetano","Pasodoble"],["san-jose-de-buena-vista","San josé de buena vista",""],["se-puede-se-debe","Se puede, se debe","Cha cha chá"],["si-la-vieras","Si la vieras",""],["si-vas-para-chile","Si vas para chile","Vals"],["sortilegio","Sortilegio","Bolero"],["te-canta-la-utal","Te canta la utal","Pasodoble"],["te-esperare","Te esperaré","Vals"],["te-quiero","Te quiero","Vals"],["toda-una-vida","Toda una vida","Bolero"],["tuna-distrito-upla","Tuna distrito upla","Pasodoble"],["un-monton-de-estrellas","Un montón de estrellas","Salsa"],["un-paseo-por-las-nubes","Un paseo por las nubes","Bolero"],["uno-y-tres","Uno y tres","Bolero"],["vagabundo-por-santa-cruz","Vagabundo por santa cruz","Pasodoble"],["vida","Vida","Foxtrot"],["vida-mia","Vida mia","Bolero"],["viva-que-viva-la-vida","Viva, que viva la vida","Pasodoble"],["y-nos-dieron-las-diez","Y nos dieron las diez","Vals"]]; // del cancionero de la Tuna (94 canciones)
+const CANC = Object.fromEntries(CANCIONES.map(([id,t,r])=>[id,{id,titulo:t,ritmo:r||"Sin estilo"}]));
+const SLOT = {
+  paso:{label:"Pasodoble",ok:r=>r==="Pasodoble"},
+  libre:{label:"Libre (no pasodoble ni bolero)",ok:r=>r!=="Pasodoble"&&r!=="Bolero"},
+  bovals:{label:"Bolero o vals",ok:r=>r==="Bolero"||r==="Vals"},
+  any:{label:"Cualquier canción",ok:()=>true},
+  bis:{label:"Bis",ok:()=>true}};
+const PLANTILLAS = {
+  perutaly:{nombre:"Parche «Perutaly» (rondas de 3)",param:"Rondas",def:4,
+    build:n=>{const s=[];for(let i=1;i<=n;i++)["paso","libre","bovals"].forEach(t=>s.push({tipo:t,grupo:"Ronda "+i}));return s}},
+  duracion:{nombre:"Contrato por duración",param:"Minutos de show",def:45,
+    build:m=>Array.from({length:Math.max(1,Math.round(m/3.75))},()=>({tipo:"any",grupo:"Show de "+m+" min"}))},
+  presentacion:{nombre:"Presentación o encuentro (+ bis)",param:"Canciones",def:5,
+    build:n=>[...Array.from({length:n},()=>({tipo:"any",grupo:"Presentación"})),{tipo:"bis",grupo:"Bis"}]},
+  libre:{nombre:"Lista libre",param:"Canciones",def:10,build:n=>Array.from({length:n},()=>({tipo:"any",grupo:"Repertorio"}))}};
+const DEF_PLANTILLA = {parche:"perutaly",contrato:"duracion",llamado:"presentacion"};
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
 const clp = n=>(n<0?"−$":"$")+Math.abs(Math.round(+n||0)).toLocaleString("es-CL");
 const sum = (a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
@@ -350,7 +378,7 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],llamados:[],respuestas:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
       ready:{m:!u,t:false,p:false,c:false,l:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
@@ -375,6 +403,7 @@ function subscribeAll(fs){
   // llamados y respuestas: solo los últimos 90 días, para cuidar el límite gratuito de lecturas
   const cut=daysAgo(90);
   unsubs.push(fs.collection("llamados").where("fecha",">=",cut).onSnapshot(snap=>{S.llamados=mine(snap);S.ready.l=true;render()},()=>{S.ready.l=true;render()}));
+  unsubs.push(fs.collection("llamados").where("tipo","==","presentacion").onSnapshot(snap=>{S.presAll=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("respuestas").where("fechaLlamado",">=",cut).onSnapshot(snap=>{S.respuestas=mine(snap);render()},()=>{}));
 }
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
@@ -539,6 +568,7 @@ function parcheDetail(p){
     ${g?`<tr><td>Gastos${p.gastosDetalle?" ("+esc(p.gastosDetalle)+")":""}</td><td></td><td class="num neg">− ${clp(g)}</td></tr>`:""}
     <tr class="total"><td>Neto</td><td></td><td class="num">${clp(neto)}</td></tr>
     ${n?`<tr><td>Por asistente (${n})</td><td></td><td class="num">${clp(neto/n)}</td></tr>`:""}</tbody></table></div></div>`}
+  ${repBlock("parche",p)}
   ${asistentesBlock(p,"parche")}
   ${isTuno()?`<div class="btn-row"><button class="btn" data-edit-parche="${esc(p.id)}">${prog?"Editar / registrar conteo":"Editar"}</button><button class="btn danger" data-del-parche="${esc(p.id)}">Eliminar</button></div>`:""}`}
 function contratoDetail(c){const cost=costosTotal(c),u=contratoUtil(c),n=att(c),m=+c.monto||0;
@@ -553,6 +583,7 @@ function contratoDetail(c){const cost=costosTotal(c),u=contratoUtil(c),n=att(c),
     <tr class="total"><td>Utilidad</td><td class="num ${u<0?"neg":""}">${clp(u)}</td></tr>
     ${m?`<tr><td>Margen</td><td class="num">${Math.round(u/m*100)}%</td></tr>`:""}
     ${n?`<tr><td>Por integrante (${n})</td><td class="num">${clp(u/n)}</td></tr>`:""}</tbody></table></div></div>
+  ${repBlock("contrato",c)}
   ${asistentesBlock(c,"contrato")}
   ${isTuno()?`<div class="btn-row"><button class="btn" data-edit-contrato="${esc(c.id)}">Editar</button><button class="btn danger" data-del-contrato="${esc(c.id)}">Eliminar</button></div>`:""}`}
 
@@ -641,8 +672,8 @@ function viewKpi(){
   <div class="filters">${per.map(([k,l])=>`<button class="chip" data-kper="${k}" aria-pressed="${S.kpiPeriodo===k}">${l}</button>`).join("")}</div>`;
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&!esProgramado(p));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
-  const tk=tareasKpi(ini,hoy);
-  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+tk+exportBlock();
+  const tk=tareasKpi(ini,hoy),ck=cancionesKpi(P,C,ini,hoy);
+  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+tk+exportBlock();
   const netoP=sum(P,parcheNeto),cobr=sum(C,c=>c.monto),cost=sum(C,costosTotal),utilC=cobr-cost,attP=sum(P,att),attC=sum(C,att),nEv=P.length+C.length;
   const mids=Object.keys(S.members),uniq=new Set([...P,...C].flatMap(e=>e.asistentes||[]).filter(id=>S.members[id]));
   h+=`<div class="kpis">
@@ -666,6 +697,7 @@ function viewKpi(){
   if(P.length){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
     h+=chartBlock("Recaudación por parche"+(P.length>12?" · últimos 12":""),null,barsChart(lp.map(p=>+p.fecha.slice(8)+"/"+(+p.fecha.slice(5,7))),[s],fmtMoneyShort,
       i=>{const p=lp[i],n=att(p);return `${p.lugar||"Parche"} · ${fmtDate(p.fecha)}\nNeto: ${clp(parcheNeto(p))}\n${n} asistente${n===1?"":"s"}${n?" · "+clp(parcheNeto(p)/n)+" c/u":""}`}),"Monto neto de cada parche, en orden de fecha.")}
+  h+=ck;
   const rows=mids.map(id=>({id,p:P.filter(e=>(e.asistentes||[]).includes(id)).length,c:C.filter(e=>(e.asistentes||[]).includes(id)).length}))
     .sort((a,b)=>(b.p+b.c)-(a.p+a.c)||nameOf(a.id).localeCompare(nameOf(b.id)));
   const act=rows.filter(r=>r.p+r.c),zero=rows.filter(r=>!(r.p+r.c)),mxr=Math.max(1,...act.map(r=>r.p+r.c));
@@ -695,7 +727,7 @@ async function exportCsv(kind){
   try{await dl.save({filename:`tuna-utal-${kind}-${todayStr()}.csv`,data:csv})}catch(e){if(!e||e.code!=="declined")toast("No se pudo descargar el archivo.")}}
 
 // ---------- llamados ----------
-const TIPOS_LLAMADO={reunion:"Reunión",ensayo:"Ensayo",parche:"Parche",contrato:"Contrato",evento:"Evento"};
+const TIPOS_LLAMADO={reunion:"Reunión",ensayo:"Ensayo",parche:"Parche",contrato:"Contrato",presentacion:"Presentación o encuentro",evento:"Evento"};
 const respDe=lid=>S.respuestas.filter(r=>r.llamado===lid);
 const miResp=lid=>(S.respuestas.find(r=>r.llamado===lid&&r.uid===S.myId)||{}).r||null;
 const llamadoAbierto=l=>(l.fecha||"")>=todayStr();
@@ -733,6 +765,7 @@ function llamadoDetail(l){const rs=respDe(l.id),voy=rs.filter(r=>r.r==="voy").ma
   ${ab?`<div class="block"><h4>Tu respuesta</h4>${puedeSumarse(l.tipo)||mr==="voy"?`<div class="seg seg2"><button data-resp="voy" aria-pressed="${mr==="voy"}">Voy</button><button data-resp="no" aria-pressed="${mr==="no"}">No puedo</button></div>`
     :`<p class="muted-p">Llevas menos de 2 meses como aspirante: un tuno debe sumarte a este ${tl}.</p><div class="seg seg2" style="margin-top:8px"><button data-resp="no" aria-pressed="${mr==="no"}">No puedo</button></div>`}
     ${ev?`<p class="chart-note">Si confirmas, quedas anotado también en el ${l.vinculo.col==="parches"?"parche":"contrato"}.</p>`:""}</div>`:""}
+  ${["presentacion","evento"].includes(l.tipo)&&!ev?repBlock("llamado",l):""}
   <div class="block"><h4>Van · ${voy.length}</h4>${chipsOf(voy)||'<p class="muted-p">Nadie todavía.</p>'}
     <h4 style="margin-top:14px">No van · ${no.length}</h4>${chipsOf(no)||'<p class="muted-p">Nadie.</p>'}
     ${isTuno()&&ab?`<h4 style="margin-top:14px">Sin responder · ${sin.length}</h4>${chipsOf(sin)||'<p class="muted-p">Todos respondieron.</p>'}`:""}</div>
@@ -754,6 +787,52 @@ function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
     <span class="hint">Quienes confirmen quedan anotados en ese parche o contrato.</span></div>
   ${membersChecks(voy,"Confirmados (aquí puedes sumar a aspirantes nuevos)")}
   <button class="btn primary" type="submit">${l?"Guardar cambios":"Publicar llamado"}</button></form>`}
+
+// ---------- repertorio ----------
+const evFor=(k,id)=>k==="parche"?S.parches.find(x=>x.id===id):k==="contrato"?S.contratos.find(x=>x.id===id):(S.llamados.find(x=>x.id===id)||S.presAll.find(x=>x.id===id));
+const evTitle=(k,e)=>k==="parche"?"Parche · "+(e.lugar||"")+" · "+fmtDate(e.fecha):k==="contrato"?"Contrato · "+(e.cliente||"")+" · "+fmtDate(e.fecha):(TIPOS_LLAMADO[e.tipo]||"Llamado")+" · "+(e.titulo||"")+" · "+fmtDate(e.fecha);
+function playCounts(){const c={};[...S.parches,...S.contratos,...S.presAll].forEach(e=>(e.repertorio||[]).forEach(s=>{if(s.id)c[s.id]=(c[s.id]||0)+1}));return c}
+const repCountTxt=()=>S.repDraft.filter(s=>s.id).length+" de "+S.repDraft.length+" canciones elegidas";
+function repSlotsHtml(){let g=null,h="";
+  S.repDraft.forEach((sl,i)=>{if(sl.grupo!==g){g=sl.grupo;h+=`<p class="group-label">${esc(g)}</p>`}
+    const T=SLOT[sl.tipo]||SLOT.any,opts=CANCIONES.filter(([id,t,r])=>T.ok(r||"Sin estilo"));
+    h+=`<div class="rep-row"><span class="rep-n">${i+1}</span><div class="field" style="flex:1;min-width:0"><label class="rep-l" for="rs${i}">${esc(T.label)}</label>
+      <select class="input" id="rs${i}" data-rep-slot="${i}"><option value="">— Elegir canción —</option>${opts.map(([id,t,r])=>`<option value="${id}" ${sl.id===id?"selected":""}>${esc(t)} · ${esc(r||"Sin estilo")}</option>`).join("")}</select></div>
+      <span class="rep-mv"><button type="button" class="btn small" data-rep-mv="${i}:-1" aria-label="Subir canción" ${i?"":"disabled"}>↑</button><button type="button" class="btn small" data-rep-mv="${i}:1" aria-label="Bajar canción" ${i<S.repDraft.length-1?"":"disabled"}>↓</button></span></div>`});
+  return h+`<p class="chart-note" id="repCount">${repCountTxt()}</p>`}
+function repForm(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=rp.id||DEF_PLANTILLA[o.kind],pr=rp.param||PLANTILLAS[pl].def;
+  if(!S.repDraft)S.repDraft=(ev.repertorio&&ev.repertorio.length)?ev.repertorio.map(x=>({...x})):PLANTILLAS[pl].build(pr);
+  return `<h2>Repertorio</h2><p class="chart-note" style="margin:-6px 0 12px">${esc(evTitle(o.kind,ev))}</p>
+  <form class="f" id="repForm">
+    <div class="two"><div class="field"><label for="rPl">Estructura</label><select class="input" id="rPl">${Object.entries(PLANTILLAS).map(([k,p])=>`<option value="${k}" ${k===pl?"selected":""}>${p.nombre}</option>`).join("")}</select></div>
+      <div class="field"><label for="rParam" id="rParamL">${PLANTILLAS[pl].param}</label><input type="number" inputmode="numeric" min="1" max="120" id="rParam" value="${pr}"></div></div>
+    <p class="chart-note" style="margin:0">Un show de 45 min son 12 canciones y uno de 20 min son 5. Toca «Aplicar estructura» al cambiar la estructura o la cantidad.</p>
+    <div class="btn-row"><button type="button" class="btn small" data-rep-build>Aplicar estructura</button><button type="button" class="btn small gold" data-rep-sugerir>Sugerir canciones</button></div>
+    <div id="repSlots">${repSlotsHtml()}</div>
+    <button class="btn primary" type="submit">Guardar repertorio</button></form>`}
+function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<div class="block"><h4>Repertorio${r.length?" · "+r.length+" canciones":""}</h4>`;
+  if(!r.length)h+=`<p class="muted-p">${isTuno()?"Aún no se arma el repertorio de este evento.":"El repertorio aún no está definido."}</p>`;
+  else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
+    h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`}
+  if(isTuno())h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
+  return h+`</div>`}
+function cancionesKpi(P,C,ini,hoy){
+  const L=S.presAll.filter(l=>l.fecha>=ini&&l.fecha<=hoy),cnt={};
+  const add=(e,src)=>(e.repertorio||[]).forEach(s=>{if(!s.id)return;const c=cnt[s.id]=cnt[s.id]||{id:s.id,titulo:s.titulo,ritmo:s.ritmo||"Sin estilo",p:0,c:0,l:0};c[src]++});
+  P.forEach(e=>add(e,"p"));C.forEach(e=>add(e,"c"));L.forEach(e=>add(e,"l"));
+  const rows=Object.values(cnt).map(r=>({...r,t:r.p+r.c+r.l})).sort((a,b)=>b.t-a.t||a.titulo.localeCompare(b.titulo));
+  const evs=[...P,...C,...L],conRep=evs.filter(e=>(e.repertorio||[]).some(s=>s.id)).length;
+  let h=`<div class="block"><h4>Canciones más tocadas</h4>`;
+  if(!rows.length)return h+`<p class="muted-p">Aún no hay repertorios en este período. Arma el repertorio de cada parche, contrato o presentación y aquí verás qué canciones se tocan más.</p></div>`;
+  const top=rows.slice(0,10),mx=top[0].t,tot=sum(rows,r=>r.t);
+  h+=`<div class="kpis" style="margin-bottom:10px"><div class="kpi"><span>Más tocada</span><b style="font-size:17px">${esc(top[0].titulo)}</b><small>${top[0].t} veces · ${esc(top[0].ritmo)}</small></div>
+    <div class="kpi"><span>Interpretaciones</span><b>${tot}</b><small>${rows.length} canciones distintas</small></div></div>
+  <div class="rank">${top.map(r=>`<div class="rank-row" data-tip="${esc(r.titulo+" ("+r.ritmo+")\nParches: "+r.p+" · Contratos: "+r.c+" · Presentaciones: "+r.l)}"><span class="rank-name">${esc(r.titulo)}</span><span class="rank-bar"><span style="width:${r.t/mx*100}%;background:var(--gold)"></span></span><span class="rank-n">${r.t}</span></div>`).join("")}</div>
+  <p class="chart-note">${conRep} de ${evs.length} eventos del período tienen repertorio registrado. ${CANCIONES.length-rows.filter(r=>CANC[r.id]).length} canciones del cancionero no se han tocado.</p></div>`;
+  const g={};rows.forEach(r=>{g[r.ritmo]=(g[r.ritmo]||0)+r.t});
+  h+=`<div class="block"><h4>Ritmos más tocados</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Ritmo</th><th class="num">Veces</th><th class="num">%</th></tr></thead><tbody>${
+    Object.entries(g).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v}</td><td class="num">${Math.round(v/tot*100)}%</td></tr>`).join("")}</tbody></table></div></div>`;
+  return h}
 
 // ---------- tareas cumplidas (solo tunos) ----------
 function tareasKpi(ini,hoy){
@@ -826,14 +905,15 @@ function renderSheet(){
   else if(S.sheet.type==="contrato"){const c=S.contratos.find(x=>x.id===S.sheet.id);if(!c){S.sheet=null;L.innerHTML="";return}inner=contratoDetail(c)}
   else if(S.sheet.type==="llamado"){const l=S.llamados.find(x=>x.id===S.sheet.id);if(!l){S.sheet=null;L.innerHTML="";return}inner=llamadoDetail(l)}
   else if(S.sheet.type==="llamadoForm")inner=llamadoForm(S.sheet);
+  else if(S.sheet.type==="repForm"){if(!evFor(S.sheet.kind,S.sheet.id)){S.sheet=null;L.innerHTML="";return}inner=repForm(S.sheet)}
   else if(S.sheet.type==="parcheForm")inner=parcheForm(S.sheet);
   else if(S.sheet.type==="contratoForm")inner=contratoForm(S.sheet);
   L.innerHTML=`<div class="overlay" data-backdrop><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div><button class="close" data-close aria-label="Cerrar">×</button>${inner}</div></div>`;
   const sh=L.querySelector(".sheet");if(sh)sh.scrollTop=scroll;
   if(draft&&L.querySelector("#noteText"))L.querySelector("#noteText").value=draft;
 }
-function openSheet(o){S.sheet=o;$("#layer").innerHTML="";renderSheet();updateLive()}
-function closeSheet(){S.sheet=null;$("#layer").innerHTML=""}
+function openSheet(o){S.sheet=o;S.repDraft=null;$("#layer").innerHTML="";renderSheet();updateLive()}
+function closeSheet(){S.sheet=null;S.repDraft=null;$("#layer").innerHTML=""}
 
 function taskDetail(t){
   const d=dueInfo(t);const subs=S.tasks.filter(x=>x.padre===t.id);const parent=t.padre&&S.tasks.find(x=>x.id===t.padre);
@@ -913,6 +993,12 @@ document.addEventListener("submit",async e=>{
       await safe(()=>tref(o.id).update({...data,actualizado:new Date().toISOString()}),"Cambios guardados");openSheet({type:"task",id:o.id})}
     else{const id=uid();await safe(()=>tref(id).set({...data,estado:"pendiente",fechaLimiteOriginal:fecha,creadoPor:S.myId,agrupacion:AGRUPACION,padre:o.padre||null,notas:[],solicitudPlazo:null,creado:new Date().toISOString()}),"Tarea creada");
       if(o.padre)openSheet({type:"task",id:o.padre});else closeSheet()}}
+  if(f.id==="repForm"){const o=S.sheet,ev=evFor(o.kind,o.id);if(!ev)return;
+    const pl=$("#rPl").value,pr=Math.round(+$("#rParam").value||PLANTILLAS[pl].def);
+    const repertorio=S.repDraft.map(x=>({tipo:x.tipo,grupo:x.grupo,id:x.id||"",titulo:x.titulo||"",ritmo:x.ritmo||""}));
+    const col=o.kind==="parche"?"parches":o.kind==="contrato"?"contratos":"llamados";
+    await safe(()=>S.db.doc(col+"/"+o.id).update({repertorio,repPlantilla:{id:pl,param:pr}}),"Repertorio guardado");
+    openSheet({type:o.kind==="parche"?"parche":o.kind==="contrato"?"contrato":"llamado",id:o.id});return}
   if(f.id==="llamadoForm"){const o=S.sheet,vin=$("#lVinc").value,now=new Date().toISOString();
     const data={tipo:$("#lTipo").value,titulo:$("#lTitulo").value.trim(),fecha:$("#lFecha").value,hora:$("#lHora").value,lugar:$("#lLugar").value.trim(),mensaje:$("#lMsg").value.trim(),
       vinculo:vin?{col:vin.split(":")[0],id:vin.split(":")[1]}:null};
@@ -967,6 +1053,10 @@ document.addEventListener("change",async e=>{
   if(el.id==="fcat"){S.filterCat=el.value;render()}
   if(el.id==="fper"){S.filterPersona=el.value;render()}
   if(el.dataset.ingreso&&el.value){await safe(()=>S.db.doc("miembros/"+el.dataset.ingreso).update({ingreso:el.value,ingresoMs:msOf(el.value)}),"Fecha de ingreso guardada");return}
+  if(el.dataset.repSlot!=null&&S.repDraft){const sl=S.repDraft[+el.dataset.repSlot],c=CANC[el.value];
+    if(sl){if(c)Object.assign(sl,{id:c.id,titulo:c.titulo,ritmo:c.ritmo});else{delete sl.id;delete sl.titulo;delete sl.ritmo}}
+    const nt=$("#repCount");if(nt)nt.textContent=repCountTxt();return}
+  if(el.id==="rPl"){$("#rParamL").textContent=PLANTILLAS[el.value].param;$("#rParam").value=PLANTILLAS[el.value].def;return}
   if(el.dataset.grado){const id=el.dataset.grado;await safe(()=>S.db.doc("miembros/"+id).update({grado:el.value}),nameOf(id)+" ahora es "+GRADOS[el.value].toLowerCase())}
 });
 
@@ -988,6 +1078,23 @@ document.addEventListener("click",async e=>{
   if(ds.resp){const l=S.llamados.find(x=>x.id===(S.sheet&&S.sheet.id));if(!l)return;const mr=miResp(l.id);if(mr===ds.resp)return;
     if(ds.resp==="voy"&&!puedeSumarse(l.tipo)){toast("Un tuno debe sumarte.");return}
     await setResp(l,S.myId,ds.resp,ds.resp==="voy"?"Confirmaste que vas":"Avisaste que no puedes");return}
+  if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
+  if("repBuild" in ds){const pl=$("#rPl").value,pr=Math.max(1,Math.min(120,Math.round(+$("#rParam").value||PLANTILLAS[pl].def)));
+    const prev=S.repDraft.filter(x=>x.id),used=new Set();
+    S.repDraft=PLANTILLAS[pl].build(pr).map(sl=>{const T=SLOT[sl.tipo]||SLOT.any;const k=prev.findIndex((x,i)=>!used.has(i)&&T.ok(x.ritmo));
+      if(k<0)return sl;used.add(k);const x=prev[k];return {...sl,id:x.id,titulo:x.titulo,ritmo:x.ritmo}});
+    $("#repSlots").innerHTML=repSlotsHtml();return}
+  if(ds.repMv){const [i,d]=ds.repMv.split(":").map(Number),j=i+d,a=S.repDraft[i],b=S.repDraft[j];if(!a||!b)return;
+    const ta=SLOT[a.tipo]||SLOT.any,tb=SLOT[b.tipo]||SLOT.any;
+    if((b.id&&!ta.ok(b.ritmo))||(a.id&&!tb.ok(a.ritmo))){toast("Ese cambio rompe la estructura: el ritmo no corresponde a ese lugar.");return}
+    const pick=x=>({id:x.id,titulo:x.titulo,ritmo:x.ritmo}),pa=pick(a),pb=pick(b);
+    Object.assign(a,pb);Object.assign(b,pa);[a,b].forEach(x=>{if(!x.id){delete x.id;delete x.titulo;delete x.ritmo}});
+    $("#repSlots").innerHTML=repSlotsHtml();return}
+  if("repSugerir" in ds){const cnt=playCounts(),used=new Set(S.repDraft.filter(x=>x.id).map(x=>x.id));let n=0;
+    S.repDraft.forEach(sl=>{if(sl.id)return;const T=SLOT[sl.tipo]||SLOT.any;
+      const c=CANCIONES.filter(([id,t,r])=>!used.has(id)&&T.ok(r||"Sin estilo")).map(a=>({a,k:(cnt[a[0]]||0)+Math.random()*1.5})).sort((x,y)=>x.k-y.k)[0];
+      if(c){used.add(c.a[0]);Object.assign(sl,{id:c.a[0],titulo:c.a[1],ritmo:c.a[2]||"Sin estilo"});n++}});
+    $("#repSlots").innerHTML=repSlotsHtml();toast(n?"Se sugirieron "+n+" canciones, priorizando las menos tocadas":"No quedan espacios vacíos");return}
   if(ds.parche){openSheet({type:"parche",id:ds.parche});return}
   if(ds.contrato){openSheet({type:"contrato",id:ds.contrato});return}
   if(ds.editParche){openSheet({type:"parcheForm",id:ds.editParche});return}
