@@ -316,6 +316,7 @@ body.es-tuno header.top{border-bottom-color:var(--gold);box-shadow:0 2px 0 var(-
 .rep-item{display:flex;align-items:center;gap:10px;font-size:14px}
 .rep-t{flex:1;min-width:0;overflow-wrap:anywhere}
 .rep-r{font-size:12px;color:var(--muted);white-space:nowrap}
+.btn-mote{border:0;background:transparent;color:var(--muted);font:inherit;font-size:15px;cursor:pointer;padding:2px 8px;min-height:32px;border-radius:6px}.btn-mote:hover{color:var(--ink);background:var(--line)}
 .av-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .av-item{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer;min-height:44px}
 .av-item small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
@@ -441,6 +442,8 @@ function antiguedadOk(id){const m=S.members[id];if(!m)return false;if(m.grado!==
   const ing=ingresoDe(id);if(!ing)return false;const d=new Date();d.setMonth(d.getMonth()-2);
   const lim=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");return ing<=lim}
 const canManage = ()=>isTuno();
+// El mote de pardillos y aspirantes lo pueden cambiar los tunos y los administradores de la app.
+const canMote = id=>(isTuno()||S.isOwner)&&["pardillo","aspirante"].includes(grado(id))&&!S.members[id]?.admin;
 function plazoCheck(t){
   const g=me()?.grado;
   if(!(g==="pardillo"||g==="aspirante")||!isAssigned(t))return {show:false};
@@ -1452,7 +1455,7 @@ function viewPeople(){
       <button class="btn small gold" data-accept="${esc(r.id)}">Aceptar</button><button class="btn small" data-reject="${esc(r.id)}" aria-label="Rechazar">✕</button></div>`).join("")
       :`<p style="margin:0;color:var(--muted);font-size:14px">No hay solicitudes. Comparte el enlace de la app con los integrantes y pídeles que entren con Google y soliciten ingreso.</p>`}</div>`}
   h+=`<div class="block">${ids.map(id=>`<div class="person"><div class="avatar" style="background:${grado(id)==="tuno"?"var(--gold)":grado(id)==="pardillo"?"var(--wine)":"var(--info)"};color:${grado(id)==="tuno"?"#2b1a00":"#fff"}">${esc(initials(nameOf(id)))}</div>
-    <div class="info"><b>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</b><span>${count(id)} tarea${count(id)===1?"":"s"} activa${count(id)===1?"":"s"} · ${asis(id)} asistencia${asis(id)===1?"":"s"}${grado(id)==="aspirante"?(antiguedadOk(id)?" · más de 2 meses":" · menos de 2 meses"):""}${misInstr(id).length?" · "+misInstr(id).map(instName).join(", "):""}</span></div>
+    <div class="info"><b>${esc(nameOf(id))}${id===S.myId?" (tú)":""}${canMote(id)?` <button class="btn-mote" data-mote="${esc(id)}" aria-label="Cambiar el mote de ${esc(nameOf(id))}" title="Cambiar mote">✎</button>`:""}</b><span>${count(id)} tarea${count(id)===1?"":"s"} activa${count(id)===1?"":"s"} · ${asis(id)} asistencia${asis(id)===1?"":"s"}${grado(id)==="aspirante"?(antiguedadOk(id)?" · más de 2 meses":" · menos de 2 meses"):""}${misInstr(id).length?" · "+misInstr(id).map(instName).join(", "):""}</span></div>
     ${canManage()&&id!==S.myId&&!S.members[id].admin?`${grado(id)!=="aspirante"?"":`<input type="date" data-ingreso="${esc(id)}" value="${esc(ingresoDe(id))}" aria-label="Fecha de ingreso de ${esc(nameOf(id))}" title="Fecha de ingreso a la Tuna" style="width:auto;min-height:36px;padding:4px 8px">`}<select data-grado="${esc(id)}" aria-label="Grado de ${esc(nameOf(id))}">${Object.entries(GRADOS).map(([k,l])=>`<option value="${k}" ${grado(id)===k?"selected":""}>${l}</option>`).join("")}</select><button class="btn small" data-remove="${esc(id)}" aria-label="Quitar">✕</button>`:`<span class="grado g-${grado(id)}">${GRADOS[grado(id)]}</span>`}
     <button class="btn small" data-person="${esc(id)}">Tareas</button></div>`).join("")}</div>`+logoutBtn();
   return h}
@@ -1616,6 +1619,11 @@ function renderSheet(){
   else if(S.sheet.type==="llamado"){const l=S.llamados.find(x=>x.id===S.sheet.id);if(!l){S.sheet=null;L.innerHTML="";return}inner=llamadoDetail(l)}
   else if(S.sheet.type==="llamadoForm")inner=llamadoForm(S.sheet);
   else if(S.sheet.type==="avisos")inner=avisosSheet();
+  else if(S.sheet.type==="mote"){const id=S.sheet.id;if(!canMote(id)){S.sheet=null;L.innerHTML="";return}
+    inner=`<h2>Cambiar mote</h2><p class="chart-note" style="margin:-6px 0 12px">${esc(GRADOS[grado(id)])} · mote actual: <b>${esc(nameOf(id))}</b></p>
+    <form class="f" id="moteForm"><div class="field"><label for="moteIn">Nuevo mote</label><input type="text" id="moteIn" required maxlength="40" value="${esc(S.members[id].apodo||"")}" autocomplete="off"></div>
+    <span class="hint">Se cambia en toda la app (tareas, eventos, repartos e indicadores) y le llega un aviso.</span>
+    <button class="btn primary" type="submit">Guardar mote</button></form>`}
   else if(S.sheet.type==="subcanc"){const e=evFor(S.sheet.kind,S.sheet.id);if(!e||!subcVigente(S.sheet.kind,e)){S.sheet=null;L.innerHTML="";return}inner=subcSheet(S.sheet)}
   else if(S.sheet.type==="repForm"){if(!evFor(S.sheet.kind,S.sheet.id)){S.sheet=null;L.innerHTML="";return}inner=repForm(S.sheet)}
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
@@ -1703,6 +1711,11 @@ document.addEventListener("submit",async e=>{
     const d={parche:pid,tipo,texto:txt,autor:S.myId,fecha:new Date().toISOString(),agrupacion:AGRUPACION};
     if(tipo==="apreciacion")d.lectores=[S.myId];else if(tipo==="castigo"){d.para=f.querySelector("select").value;d.lectores=[d.para]}else d.lectores=[];
     ta.value="";await safe(()=>S.db.doc("notasParche/"+uid()).set(d),{apreciacion:"Apreciación enviada a los tunos",castigo:"Castigo asignado",comentario:"Comentario agregado"}[tipo]);return}
+  if(f.id==="moteForm"){const id=S.sheet&&S.sheet.id,ap=$("#moteIn").value.trim();if(!id||!ap||!canMote(id))return;const antes=nameOf(id);
+    if(ap===S.members[id].apodo){closeSheet();return}
+    await safe(()=>S.db.doc("miembros/"+id).update({apodo:ap}),"Mote actualizado");closeSheet();
+    try{const aid=uid();await S.raw.doc("avisos/"+aid).set({para:[id],por:S.myId,texto:`${yo()} cambió tu mote: ahora eres «${ap}» (antes «${antes}»)`,kind:"",ref:"",fecha:new Date().toISOString(),leidos:[],agrupacion:AGRUPACION});avPush(aid)}catch(e){}
+    return}
   if(f.id==="ownerForm"){const ap=$("#ownApodo").value.trim();if(!ap)return;
     await safe(()=>S.db.doc("miembros/"+S.myId).set({apodo:ap,grado:"tuno",agrupacion:AGRUPACION,desde:new Date().toISOString(),admin:true}),"Listo, ya eres parte del planificador")}
   if(f.id==="joinForm"){const ap=$("#joinApodo").value.trim();if(!ap)return;
@@ -1911,6 +1924,7 @@ document.addEventListener("click",async e=>{
   if("pushOn" in ds){activarPush();return}
   if("avTodos" in ds){avLeer((S.avisos||[]).filter(a=>!(a.leidos||[]).includes(S.myId)).map(a=>a.id));return}
   if(ds.av){const a=(S.avisos||[]).find(x=>x.id===ds.av);if(!a)return;if(!(a.leidos||[]).includes(S.myId))avLeer([a.id]);avAbrir(a.kind,a.ref);return}
+  if(ds.mote){openSheet({type:"mote",id:ds.mote});return}
   if(ds.subc){const [k,id]=ds.subc.split(":");abrirSubc(k,id);return}
   if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
   if(ds.repSug){const [k,id]=ds.repSug.split(":");openSheet({type:"repForm",kind:k,id,sug:true});return}
