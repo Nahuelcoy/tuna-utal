@@ -8,3 +8,6 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "802290234816",
   appId: "1:802290234816:web:7f16ab7910f5f8ff830425"
 };
+
+// Clave pública para las notificaciones al celular (Cloud Messaging). Es pública: no es secreta.
+window.FIREBASE_VAPID = "BOavXsIzJozgQu6Jboh8ErGm6QPYLIb7Y6xEiN52NEzbcckCAdLQJd1sQppbqy9GfrvIvbUM3mVPjFjrzmPQT-0";
