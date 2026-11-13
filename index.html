@@ -268,6 +268,7 @@ table.kt .num{text-align:right}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
 .solo-tunos{color:var(--gold-ink);font-weight:600}
+.aud-tunos{background:var(--gold);color:#2b1a00}.aud-tunos_pardillos{background:var(--wine-soft);color:var(--wine-ink)}
 .locales{display:flex;flex-direction:column}
 .local{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}.local:last-child{border-bottom:0}
 .veces{display:flex;align-items:center;gap:2px;font-variant-numeric:tabular-nums}.veces .chip-x{font-size:18px;padding:0 8px;min-height:32px}
@@ -436,7 +437,7 @@ function subscribeAll(fs){
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   unsubs.push(fs.collection("miembros").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.data();if(v&&(v.agrupacion||AGRUPACION)===AGRUPACION)m[d.id]=v});
     S.members=m;S.ready.m=true;
-    subTareas(fs);
+    subTareas(fs);subLlamados(fs);
     if(isTuno()&&!reqSub){reqSub=true;unsubs.push(fs.collection("solicitudes").onSnapshot(sn=>{S.requests=sn.docs.map(d=>({id:d.id,...d.data()}));loadProfiles();render()},()=>{}))}
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
 
@@ -446,9 +447,7 @@ function subscribeAll(fs){
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
   // llamados y respuestas: solo los últimos 90 días, para cuidar el límite gratuito de lecturas
   const cut=daysAgo(90);
-  unsubs.push(fs.collection("llamados").where("fecha",">=",cut).onSnapshot(snap=>{S.llamados=mine(snap);S.ready.l=true;render()},()=>{S.ready.l=true;render()}));
-  unsubs.push(fs.collection("llamados").where("tipo","==","presentacion").onSnapshot(snap=>{S.presAll=mine(snap);render()},()=>{}));
-  unsubs.push(fs.collection("respuestas").where("fechaLlamado",">=",cut).onSnapshot(snap=>{S.respuestas=mine(snap);render()},()=>{}));
+
 }
 // Tareas: los tunos ven todas; pardillos y aspirantes solo las que no son exclusivas de tunos.
 let tareasModo=null,tareasUnsub=null;const backfilled=new Set();
@@ -461,6 +460,26 @@ function subTareas(fs){const modo=isTuno()?"todas":me()?"todos":null;if(!modo||m
     if(modo==="todas")S.tasks.forEach(t=>{const v=visDe(t.asignados);if(t.visibilidad!==v&&!backfilled.has(t.id+v)){backfilled.add(t.id+v);fs.doc("tareas/"+t.id).update({visibilidad:v}).catch(()=>{})}});
     render()},()=>{S.ready.t=true;render()});
   unsubs.push(()=>{if(tareasUnsub)tareasUnsub();tareasUnsub=null;tareasModo=null})}
+// Llamados: cada uno ve los dirigidos a su grado ("todos", "tunos_pardillos" o "tunos").
+const AUD={todos:"Todos",tunos_pardillos:"Tunos y pardillos",tunos:"Solo tunos"};
+const audsDe=g=>g==="tuno"?["todos","tunos_pardillos","tunos"]:g==="pardillo"?["todos","tunos_pardillos"]:["todos"];
+const audCrear=g=>g==="tuno"?["todos","tunos_pardillos","tunos"]:g==="pardillo"?["tunos_pardillos","todos"]:["todos"];
+const audDe=l=>l.audiencia||"todos";
+const veAud=(a,id)=>audsDe(grado(id)).includes(a||"todos");
+let llamModo=null,llamUnsubs=[];const llamBack=new Set();
+function subLlamados(fs){const g=me()?.grado;if(!g||g===llamModo)return;llamModo=g;llamUnsubs.forEach(f=>{try{f()}catch(e){}});llamUnsubs=[];
+  const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION),cut=daysAgo(90);
+  if(g==="tuno"){
+    llamUnsubs.push(fs.collection("llamados").where("fecha",">=",cut).onSnapshot(snap=>{S.llamados=mine(snap);S.ready.l=true;
+      S.llamados.forEach(l=>{if(!l.audiencia&&!llamBack.has(l.id)){llamBack.add(l.id);fs.doc("llamados/"+l.id).update({audiencia:"todos"}).catch(()=>{})}});render()},()=>{S.ready.l=true;render()}));
+    llamUnsubs.push(fs.collection("llamados").where("tipo","==","presentacion").onSnapshot(snap=>{S.presAll=mine(snap);render()},()=>{}));
+    llamUnsubs.push(fs.collection("respuestas").where("fechaLlamado",">=",cut).onSnapshot(snap=>{S.respuestas=mine(snap);
+      S.respuestas.forEach(r=>{if(!r.audiencia&&!llamBack.has(r.id)){llamBack.add(r.id);const l=S.llamados.find(x=>x.id===r.llamado);fs.doc("respuestas/"+r.id).update({audiencia:l?audDe(l):"todos"}).catch(()=>{})}});render()},()=>{}))}
+  else{const a=audsDe(g);
+    llamUnsubs.push(fs.collection("llamados").where("audiencia","in",a).onSnapshot(snap=>{S.llamados=mine(snap).filter(l=>(l.fecha||"")>=cut);S.ready.l=true;render()},()=>{S.ready.l=true;render()}));
+    llamUnsubs.push(fs.collection("respuestas").where("audiencia","in",a).onSnapshot(snap=>{S.respuestas=mine(snap).filter(r=>(r.fechaLlamado||"")>=cut);render()},()=>{}));
+    S.presAll=[]}
+  unsubs.push(()=>{llamUnsubs.forEach(f=>{try{f()}catch(e){}});llamUnsubs=[];llamModo=null})}
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
 
 // ---------- render ----------
@@ -484,7 +503,7 @@ function render(){
 function hideChrome(){$("#nav").hidden=true;$("#fab").hidden=true;$("#hdrPeople").hidden=true}
 function showChrome(){
   $("#nav").hidden=false;
-  const fabOn=S.view==="tareas"?canCreate():S.view==="eventos"?isOrg():S.view==="llamados"?isTuno():false;
+  const fabOn=S.view==="tareas"?canCreate():S.view==="eventos"?isOrg():S.view==="llamados"?!!me():false;
   $("#fab").hidden=!fabOn;$("#fab").setAttribute("aria-label",S.view==="eventos"?(S.evTab==="contratos"?"Nuevo contrato":S.evTab==="presentaciones"?"Nueva presentación":"Nuevo parche"):S.view==="llamados"?"Nuevo llamado":"Nueva tarea");
   const pend=S.tasks.filter(t=>t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente").length;
   const ic={tareas:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>',
@@ -792,7 +811,7 @@ function cierreBlock(kind,e){const b=e.bitacora,R=e.reparto;if(!b&&!R)return"";
   if(R&&kind!=="presentacion"){const ent=Object.entries(R).filter(([,v])=>+v>0);
     h+=`<p class="rep-g">Reparto ${e.repartoAprobado?'<span class="pill st-realizada">Aprobado</span>':'<span class="pill pl-pend">Por aprobar</span>'}</p>
     <div class="tbl-wrap"><table class="money-tbl"><tbody>${ent.map(([id,v])=>`<tr><td>${esc(nameOf(id))}</td><td class="num">${clp(v)}</td></tr>`).join("")}
-    <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr><tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr></tbody></table></div>`}
+    <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr>${isTuno()?`<tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr>`:""}</tbody></table></div>`}
   return h+`</div>`}
 
 function parcheMoney(p){const tot=parcheTotal(p);if(!tot&&!+p.gastos)return"";const g=+p.gastos||0,neto=tot-g,n=att(p),ct=p.conteo||{};
@@ -839,7 +858,7 @@ function viewPresentaciones(){
 function viewEventos(){
   const tabs=[["parches","Parches"],["contratos","Contratos"],["presentaciones","Presentaciones"]];
   return `<div class="subtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-evtab="${k}" aria-selected="${S.evTab===k}">${l}</button>`).join("")}</div>`+
-    `<div class="kpis" style="margin-bottom:14px">${cajaHero()}</div>`+(S.evTab==="contratos"?viewContratos():S.evTab==="presentaciones"?viewPresentaciones():viewParches())}
+    (isTuno()?`<div class="kpis" style="margin-bottom:14px">${cajaHero()}</div>`:"")+(S.evTab==="contratos"?viewContratos():S.evTab==="presentaciones"?viewPresentaciones():viewParches())}
 
 function presForm(o){const e=o.id?S.presentaciones.find(x=>x.id===o.id):null;const v=e||{titulo:"",lugar:"",fecha:"",hora:"",minIntegrantes:6,notas:""};
   return `<h2>${e?"Editar presentación":"Nueva presentación o encuentro"}</h2><form class="f" id="presForm">
@@ -860,7 +879,7 @@ function cierreForm(o){const k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e
     <div class="reparto">${van.length?van.map(id=>`<label class="rep-p" for="rp_${esc(id)}"><span>${esc(nameOf(id))}</span><input type="number" inputmode="numeric" min="0" step="100" id="rp_${esc(id)}" data-reparto="${esc(id)}" value="${+R[id]||""}" placeholder="0"></label>`).join(""):`<p class="muted-p">No hay participantes registrados.</p>`}</div></div>
   ${van.length?`<div class="two"><div class="field"><label for="fondoPct">Dejar para la Tuna (%)</label><input type="number" id="fondoPct" inputmode="numeric" min="0" max="100" value="${e.fondoPct??20}"></div>
     <div class="field" style="justify-content:flex-end"><button type="button" class="btn small" data-rep-igual="${neto}">Repartir el resto en partes iguales</button></div></div>`:""}
-  <div class="live-total" id="cierreLive" data-neto="${neto}" data-saldo="${resumenCaja().saldo-(etapaDe(k,e)==="cerrado"?(+e.fondoTuna||0):0)}"></div>
+  <div class="live-total" id="cierreLive" data-neto="${neto}" ${isTuno()?`data-saldo="${resumenCaja().saldo-(etapaDe(k,e)==="cerrado"?(+e.fondoTuna||0):0)}"`:""}></div>
   ${k==="contrato"?`<label class="inline-check"><input type="checkbox" id="pagoOk" ${e.estado==="pagado"?"checked":""}> El cliente ya pagó</label>`:""}
   ${isTuno()?"":`<p class="chart-note">El reparto quedará «por aprobar» hasta que un tuno lo apruebe.</p>`}`}
   <button class="btn primary" type="submit">Guardar y cerrar</button></form>`}
@@ -884,7 +903,7 @@ async function setEtapa(kind,id,et){const e=KIND[kind].arr().find(x=>x.id===id);
 function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.cliente!==undefined?"contrato":"parche",e)==="cerrado");
   const fondo=sum(ev,e=>e.fondoTuna),rep=sum(ev,e=>sum(Object.values(e.reparto||{}),v=>v));
   const loc={};P.forEach(p=>(p.paradas||[]).forEach(x=>{const k=(x.local||"").trim();if(!k)return;const o=loc[k.toLowerCase()]=loc[k.toLowerCase()]||{n:k,v:0,p:new Set()};o.v+=+x.veces||1;o.p.add(p.id)}));
-  let h=`<div class="kpis"><div class="kpi hero"><span>Fondo para la Tuna en el período</span><b>${clp(fondo)}</b><small>${clp(rep)} repartido entre integrantes · ${ev.length} ${ev.length===1?"evento cerrado":"eventos cerrados"} con reparto</small></div></div>`;
+  let h=!isTuno()?"":`<div class="kpis"><div class="kpi hero"><span>Fondo para la Tuna en el período</span><b>${clp(fondo)}</b><small>${clp(rep)} repartido entre integrantes · ${ev.length} ${ev.length===1?"evento cerrado":"eventos cerrados"} con reparto</small></div></div>`;
   const Lc=Object.values(loc).sort((a,b)=>b.v-a.v).slice(0,8);
   if(Lc.length)h+=`<div class="block"><h4>Locales donde más se toca</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Local</th><th class="num">Parches</th><th class="num">Pasadas</th></tr></thead><tbody>${
     Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
@@ -971,7 +990,7 @@ function viewKpi(){
   if(!S.ready.p||!S.ready.c)return loadingHtml;
   const per=[["3m","3 meses"],["6m","6 meses"],["anio","Este año"],["todo","Todo"]],ini=periodStart(),hoy=todayStr();
   let h=`<div class="section-head"><h2>Indicadores</h2><span>desde ${fmtDate(ini)}</span></div>
-  <div class="kpis">${cajaHero()}</div>
+  ${isTuno()?`<div class="kpis">${cajaHero()}</div>`:""}
   <div class="filters">${per.map(([k,l])=>`<button class="chip" data-kper="${k}" aria-pressed="${S.kpiPeriodo===k}">${l}</button>`).join("")}</div>`;
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
@@ -1040,13 +1059,13 @@ const puedeSumarse=tipo=>tipo==="reunion"||antiguedadOk(S.myId);
 const chipsOf=ids=>ids.length?`<div class="att">${ids.map(id=>`<span class="att-chip"><span class="dot g-${grado(id)||"x"}"></span>${esc(nameOf(id))}</span>`).join("")}</div>`:"";
 const llColor=t=>t==="parche"?"var(--s-parche)":t==="contrato"?"var(--s-contrato)":"var(--info)";
 async function setResp(l,u,r,msg){await safe(async()=>{
-  await S.db.doc("respuestas/"+l.id+"__"+u).set({llamado:l.id,uid:u,r,fecha:new Date().toISOString(),fechaLlamado:l.fecha,agrupacion:AGRUPACION});
+  await S.db.doc("respuestas/"+l.id+"__"+u).set({llamado:l.id,uid:u,r,fecha:new Date().toISOString(),fechaLlamado:l.fecha,audiencia:audDe(l),agrupacion:AGRUPACION});
   if(l.vinculo){const ev=(l.vinculo.col==="parches"?S.parches:S.contratos).find(x=>x.id===l.vinculo.id);
     if(ev){const a=ev.asistentes||[];const nu=r==="voy"?(a.includes(u)?a:[...a,u]):a.filter(x=>x!==u);if(nu.length!==a.length)await S.db.doc(l.vinculo.col+"/"+ev.id).update({asistentes:nu})}}
 },msg)}
 function llamadoCard(l){const rs=respDe(l.id),v=rs.filter(r=>r.r==="voy").length,n=rs.filter(r=>r.r==="no").length,mr=miResp(l.id),ab=llamadoAbierto(l);
   return `<button class="task" data-llamado="${esc(l.id)}"><span class="stripe" style="background:${llColor(l.tipo)}"></span><span class="body">
-    <span class="row"><span class="cat">${TIPOS_LLAMADO[l.tipo]||"Llamado"}</span>${ab?(mr==="voy"?'<span class="pill st-realizada">Voy</span>':mr==="no"?'<span class="pill st-pendiente">No voy</span>':'<span class="pill pl-pend">Responder</span>'):""}</span>
+    <span class="row"><span class="cat">${TIPOS_LLAMADO[l.tipo]||"Llamado"}</span>${audDe(l)!=="todos"?`<span class="pill aud-${audDe(l)}">${audDe(l)==="tunos"?"🔒 ":""}${AUD[audDe(l)]}</span>`:""}${ab?(mr==="voy"?'<span class="pill st-realizada">Voy</span>':mr==="no"?'<span class="pill st-pendiente">No voy</span>':'<span class="pill pl-pend">Responder</span>'):""}</span>
     <h3>${esc(l.titulo)}</h3>
     <span class="meta"><span>${fmtDateDia(l.fecha)}${l.hora?" · "+esc(l.hora):""}</span>${l.lugar?`<span>${esc(l.lugar)}</span>`:""}<span>${v} van · ${n} no</span></span></span></button>`}
 function viewLlamados(){
@@ -1063,12 +1082,13 @@ function viewLlamados(){
   if(pas.length)h+=`<p class="group-label">Anteriores</p><div class="list">${pas.map(llamadoCard).join("")}</div>`;
   return h}
 function llamadoDetail(l){const rs=respDe(l.id),voy=rs.filter(r=>r.r==="voy").map(r=>r.uid),no=rs.filter(r=>r.r==="no").map(r=>r.uid),ab=llamadoAbierto(l),mr=miResp(l.id);
-  const sin=Object.keys(S.members).filter(id=>!voy.includes(id)&&!no.includes(id));
+  const sin=Object.keys(S.members).filter(id=>!voy.includes(id)&&!no.includes(id)&&veAud(audDe(l),id));
+  const puedeEd=isTuno()||l.creadoPor===S.myId;
   const ev=l.vinculo&&(l.vinculo.col==="parches"?S.parches:S.contratos).find(x=>x.id===l.vinculo.id);
   const tl=(TIPOS_LLAMADO[l.tipo]||"llamado").toLowerCase();
   return `<h2>${esc(l.titulo)}</h2>
   <div class="block"><dl class="kv"><dt>Tipo</dt><dd>${TIPOS_LLAMADO[l.tipo]||"Llamado"}</dd><dt>Cuándo</dt><dd>${fmtDateDia(l.fecha)}${l.hora?", "+esc(l.hora):""}</dd>
-    ${l.lugar?`<dt>Lugar</dt><dd>${esc(l.lugar)}</dd>`:""}<dt>Convoca</dt><dd>${esc(nameOf(l.creadoPor))}</dd>
+    ${l.lugar?`<dt>Lugar</dt><dd>${esc(l.lugar)}</dd>`:""}<dt>Convoca</dt><dd>${esc(nameOf(l.creadoPor))}</dd><dt>Dirigida a</dt><dd>${audDe(l)==="tunos"?"🔒 ":""}${AUD[audDe(l)]}</dd>
     ${ev?`<dt>Vinculado a</dt><dd><a href="#" data-${l.vinculo.col==="parches"?"parche":"contrato"}="${esc(ev.id)}">${esc(ev.lugar||ev.cliente||"Ver")}</a></dd>`:""}</dl>
     ${l.mensaje?`<p class="desc" style="margin-top:10px">${esc(l.mensaje)}</p>`:""}</div>
   ${ab?`<div class="block"><h4>Tu respuesta</h4>${puedeSumarse(l.tipo)||mr==="voy"?`<div class="seg seg2"><button data-resp="voy" aria-pressed="${mr==="voy"}">Voy</button><button data-resp="no" aria-pressed="${mr==="no"}">No puedo</button></div>`
@@ -1077,8 +1097,8 @@ function llamadoDetail(l){const rs=respDe(l.id),voy=rs.filter(r=>r.r==="voy").ma
   ${["presentacion","evento"].includes(l.tipo)&&!ev?repBlock("llamado",l):""}
   <div class="block"><h4>Van · ${voy.length}</h4>${chipsOf(voy)||'<p class="muted-p">Nadie todavía.</p>'}
     <h4 style="margin-top:14px">No van · ${no.length}</h4>${chipsOf(no)||'<p class="muted-p">Nadie.</p>'}
-    ${isTuno()&&ab?`<h4 style="margin-top:14px">Sin responder · ${sin.length}</h4>${chipsOf(sin)||'<p class="muted-p">Todos respondieron.</p>'}`:""}</div>
-  ${isTuno()?`<div class="btn-row"><button class="btn" data-edit-llamado="${esc(l.id)}">Editar o sumar integrantes</button><button class="btn danger" data-del-llamado="${esc(l.id)}">Eliminar</button></div>`:""}`}
+    ${puedeEd&&ab?`<h4 style="margin-top:14px">Sin responder · ${sin.length}</h4>${chipsOf(sin)||'<p class="muted-p">Todos respondieron.</p>'}`:""}</div>
+  ${puedeEd?`<div class="btn-row"><button class="btn" data-edit-llamado="${esc(l.id)}">Editar o sumar integrantes</button><button class="btn danger" data-del-llamado="${esc(l.id)}">Eliminar</button></div>`:""}`}
 function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
   const v=l||{tipo:"reunion",titulo:"",fecha:"",hora:"",lugar:"",mensaje:"",vinculo:null};
   const voy=l?respDe(l.id).filter(r=>r.r==="voy").map(r=>r.uid):[];
@@ -1088,13 +1108,16 @@ function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
   return `<h2>${l?"Editar llamado":"Nuevo llamado"}</h2><form class="f" id="llamadoForm">
   <div class="two"><div class="field"><label for="lTipo">Tipo</label><select class="input" id="lTipo">${Object.entries(TIPOS_LLAMADO).filter(([k])=>!["parche","contrato","presentacion"].includes(k)||v.tipo===k).map(([k,t])=>`<option value="${k}" ${v.tipo===k?"selected":""}>${t}</option>`).join("")}</select></div>
     <div class="field"><label for="lFecha">Fecha</label><input type="date" id="lFecha" required value="${esc(v.fecha)}"></div></div>
+  <div class="field" id="lAudWrap" ${v.tipo==="reunion"?"":"hidden"}><label for="lAud">¿A quién va dirigida la reunión?</label>
+    <select class="input" id="lAud">${audCrear(me().grado).map(a=>`<option value="${a}" ${audDe(v)===a?"selected":""}>${AUD[a]}</option>`).join("")}</select>
+    <span class="hint">Solo la verán y podrán responder los grados convocados. «Todos» incluye a aspirantes.</span></div>
   <div class="field"><label for="lTitulo">Título</label><input type="text" id="lTitulo" required maxlength="90" value="${esc(v.titulo)}" placeholder="Ej: Reunión de planificación del certamen"></div>
   <div class="two"><div class="field"><label for="lHora">Hora</label><input type="time" id="lHora" value="${esc(v.hora)}"></div>
     <div class="field"><label for="lLugar">Lugar</label><input type="text" id="lLugar" maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Sala de música"></div></div>
   <div class="field"><label for="lMsg">Mensaje</label><textarea id="lMsg" maxlength="600" placeholder="Qué llevar, tenida, repertorio…">${esc(v.mensaje)}</textarea></div>
   <div class="field"><label for="lVinc">Vincular a un parche o contrato</label><select class="input" id="lVinc"><option value="">Sin vincular</option>${opts.map(([k,t])=>`<option value="${esc(k)}" ${cur===k?"selected":""}>${esc(t)}</option>`).join("")}</select>
     <span class="hint">Quienes confirmen quedan anotados en ese parche o contrato.</span></div>
-  ${membersChecks(voy,"Confirmados (aquí puedes sumar a aspirantes nuevos)")}
+  ${isTuno()||(l&&l.creadoPor===S.myId)||!l?membersChecks(voy,"Confirmados (aquí puedes sumar a aspirantes nuevos)"):""}
   <button class="btn primary" type="submit">${l?"Guardar cambios":"Publicar llamado"}</button></form>`}
 
 // ---------- repertorio ----------
@@ -1225,7 +1248,7 @@ function renderSheet(){
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
   else if(S.sheet.type==="presForm")inner=presForm(S.sheet);
   else if(S.sheet.type==="cierreForm")inner=cierreForm(S.sheet);
-  else if(S.sheet.type==="caja")inner=cajaSheet();
+  else if(S.sheet.type==="caja"){if(!isTuno()){S.sheet=null;L.innerHTML="";return}inner=cajaSheet()}
   else if(S.sheet.type==="parcheForm")inner=parcheForm(S.sheet);
   else if(S.sheet.type==="contratoForm")inner=contratoForm(S.sheet);
   L.innerHTML=`<div class="overlay" data-backdrop><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div><button class="close" data-close aria-label="Cerrar">×</button>${inner}</div></div>`;
@@ -1323,11 +1346,14 @@ document.addEventListener("submit",async e=>{
   if(f.id==="llamadoForm"){const o=S.sheet,vin=$("#lVinc").value,now=new Date().toISOString();
     const data={tipo:$("#lTipo").value,titulo:$("#lTitulo").value.trim(),fecha:$("#lFecha").value,hora:$("#lHora").value,lugar:$("#lLugar").value.trim(),mensaje:$("#lMsg").value.trim(),
       vinculo:vin?{col:vin.split(":")[0],id:vin.split(":")[1]}:null};
+    data.audiencia=data.tipo==="reunion"&&$("#lAud")?$("#lAud").value:"todos";
+    if(!audCrear(me().grado).includes(data.audiencia)){toast("Tu grado no puede convocar a ese grupo.");return}
+    if(!o.id)data.creadoPorGrado=me().grado;
     const sel=[...f.querySelectorAll("input[name=asis]:checked")].map(i=>i.value),id=o.id||uid();
     await safe(async()=>{
       if(o.id)await S.db.doc("llamados/"+id).update({...data,actualizado:now});else await S.db.doc("llamados/"+id).set({...data,creadoPor:S.myId,agrupacion:AGRUPACION,creado:now});
       const prev=respDe(id).filter(r=>r.r==="voy").map(r=>r.uid);
-      for(const u of sel)if(!prev.includes(u))await S.db.doc("respuestas/"+id+"__"+u).set({llamado:id,uid:u,r:"voy",fecha:now,fechaLlamado:data.fecha,agrupacion:AGRUPACION,sumadoPor:S.myId});
+      for(const u of sel)if(!prev.includes(u))await S.db.doc("respuestas/"+id+"__"+u).set({llamado:id,uid:u,r:"voy",fecha:now,fechaLlamado:data.fecha,audiencia:data.audiencia,agrupacion:AGRUPACION,sumadoPor:S.myId});
       for(const u of prev)if(!sel.includes(u))await S.db.doc("respuestas/"+id+"__"+u).delete();
       if(data.vinculo){const ev=(data.vinculo.col==="parches"?S.parches:S.contratos).find(x=>x.id===data.vinculo.id);
         if(ev){const a=new Set([...(ev.asistentes||[]).filter(x=>!(prev.includes(x)&&!sel.includes(x))),...sel]);await S.db.doc(data.vinculo.col+"/"+ev.id).update({asistentes:[...a]})}}
@@ -1403,6 +1429,7 @@ document.addEventListener("change",async e=>{
     if(sl){if(c)Object.assign(sl,{id:c.id,titulo:c.titulo,ritmo:c.ritmo});else{delete sl.id;delete sl.titulo;delete sl.ritmo}}
     const nt=$("#repCount");if(nt)nt.textContent=repCountTxt();return}
   if(el.id==="rPl"){$("#rParams").innerHTML=paramInputs(el.value,null);return}
+  if(el.id==="lTipo"){const w=$("#lAudWrap");if(w)w.hidden=el.value!=="reunion";return}
   if(el.id==="addMem"){const i=misInstr(el.value)[0];if(i&&$("#addInst"))$("#addInst").value=i;return}
   if(el.dataset.addTema&&el.value){const [id,i]=el.dataset.addTema.split(":"),p=S.parches.find(x=>x.id===id),t=el.value;if(!p)return;
     const L2=(p.paradas||[]).map((x,k)=>k===+i?{...x,temas:[...(x.temas||[]).filter(y=>y!==t),t]}:x);
@@ -1422,7 +1449,7 @@ document.addEventListener("click",async e=>{
   if("logout" in ds){firebase.auth().signOut();return}
   if(ds.nav){S.view=ds.nav;closeSheet();render();window.scrollTo(0,0);return}
   if(ds.evtab){S.evTab=ds.evtab;render();return}
-  if("caja" in ds){openSheet({type:"caja"});return}
+  if("caja" in ds){if(isTuno())openSheet({type:"caja"});return}
   if(ds.cajaTipo){const t=ds.cajaTipo;$("#cjTipo").value=t;document.querySelectorAll("[data-caja-tipo]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.cajaTipo===t));
     $("#cjCat").innerHTML=CAT_CAJA[t].map(c=>`<option>${c}</option>`).join("");return}
   if(ds.delCaja){const id=ds.delCaja;openSheet({type:"confirm",title:"¿Eliminar el movimiento?",text:"Se quitará de la caja y el saldo se recalculará.",yes:"Eliminar",run:async()=>{await S.db.doc("caja/"+id).delete();openSheet({type:"caja"})}});return}
