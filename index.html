@@ -260,6 +260,13 @@ table.kt .num{text-align:right}
 .inst-op{display:flex;align-items:center;gap:8px;font-size:14px;padding:4px 0;cursor:pointer}.inst-op input{width:18px;height:18px;accent-color:var(--wine)}
 .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
 .stage{border-color:var(--gold);background:var(--gold-soft)}
+.caja-hero{text-align:left;cursor:pointer;width:100%;font:inherit}
+.caja-hero small{opacity:1}
+.caja-list{display:flex;flex-direction:column}
+.caja-mov{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}.caja-mov:last-child{border-bottom:0}
+.cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
+.cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
+.pos{color:var(--ok)}
 .rep-row{display:flex;gap:10px;align-items:flex-end}
 .rep-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 .rep-row .rep-n{margin-bottom:10px}
@@ -338,7 +345,7 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],contratos:[],presentaciones:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  parches:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
   filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
@@ -405,7 +412,7 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],presentaciones:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
       ready:{m:!u,t:false,p:false,c:false,l:false,pr:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
@@ -426,6 +433,7 @@ function subscribeAll(fs){
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
   unsubs.push(fs.collection("tareas").onSnapshot(snap=>{S.tasks=mine(snap);S.ready.t=true;render()},()=>{S.ready.t=true;render()}));
   unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parches=mine(snap);S.ready.p=true;render()},()=>{S.ready.p=true;render()}));
+  unsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
   // llamados y respuestas: solo los últimos 90 días, para cuidar el límite gratuito de lecturas
@@ -626,7 +634,7 @@ function contratoForm(o){const c=o.id?S.contratos.find(x=>x.id===o.id):null;
   <button class="btn primary" type="submit">${c?"Guardar cambios":"Registrar contrato"}</button></form>`}
 function updateLive(){
   const cl=$("#cierreLive");if(cl){const neto=+cl.dataset.neto||0;let r=0;document.querySelectorAll("[data-reparto]").forEach(i=>r+=+i.value||0);const f=neto-r;
-    cl.innerHTML=`<span>Repartido <b>${clp(r)}</b></span><span>Fondo para la Tuna <b class="${f<0?"neg":""}">${clp(f)}</b></span>${f<0?'<span class="neg">El reparto supera el neto</span>':""}`}
+    cl.innerHTML=`<span>Repartido <b>${clp(r)}</b></span><span>Fondo para la Tuna <b class="${f<0?"neg":""}">${clp(f)}</b></span>${cl.dataset.saldo!=null&&f>=0?`<span>La caja quedará en <b>${clp(+cl.dataset.saldo+f)}</b></span>`:""}${f<0?'<span class="neg">El reparto supera el neto</span>':""}`}
   const pf=$("#parcheForm");if(pf&&$("#pLive")){let t=0;pf.querySelectorAll("[data-den]").forEach(i=>t+=(+i.value||0)*+i.dataset.den);t+=+$("#pOtro").value||0;
     const g=+$("#pGastos").value||0,e0=S.sheet&&S.sheet.id&&S.parches.find(x=>x.id===S.sheet.id),n=e0?att(e0):0;
     $("#pLive").innerHTML=`<span>Total <b>${clp(t)}</b></span><span>Neto <b>${clp(t-g)}</b></span><span>Por asistente <b>${n?clp((t-g)/n):"—"}</b></span>`}
@@ -793,7 +801,7 @@ function viewPresentaciones(){
 function viewEventos(){
   const tabs=[["parches","Parches"],["contratos","Contratos"],["presentaciones","Presentaciones"]];
   return `<div class="subtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-evtab="${k}" aria-selected="${S.evTab===k}">${l}</button>`).join("")}</div>`+
-    (S.evTab==="contratos"?viewContratos():S.evTab==="presentaciones"?viewPresentaciones():viewParches())}
+    `<div class="kpis" style="margin-bottom:14px">${cajaHero()}</div>`+(S.evTab==="contratos"?viewContratos():S.evTab==="presentaciones"?viewPresentaciones():viewParches())}
 
 function presForm(o){const e=o.id?S.presentaciones.find(x=>x.id===o.id):null;const v=e||{titulo:"",lugar:"",fecha:"",hora:"",minIntegrantes:6,notas:""};
   return `<h2>${e?"Editar presentación":"Nueva presentación o encuentro"}</h2><form class="f" id="presForm">
@@ -814,7 +822,7 @@ function cierreForm(o){const k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e
     <div class="reparto">${van.length?van.map(id=>`<label class="rep-p" for="rp_${esc(id)}"><span>${esc(nameOf(id))}</span><input type="number" inputmode="numeric" min="0" step="100" id="rp_${esc(id)}" data-reparto="${esc(id)}" value="${+R[id]||""}" placeholder="0"></label>`).join(""):`<p class="muted-p">No hay participantes registrados.</p>`}</div></div>
   ${van.length?`<div class="two"><div class="field"><label for="fondoPct">Dejar para la Tuna (%)</label><input type="number" id="fondoPct" inputmode="numeric" min="0" max="100" value="${e.fondoPct??20}"></div>
     <div class="field" style="justify-content:flex-end"><button type="button" class="btn small" data-rep-igual="${neto}">Repartir el resto en partes iguales</button></div></div>`:""}
-  <div class="live-total" id="cierreLive" data-neto="${neto}"></div>
+  <div class="live-total" id="cierreLive" data-neto="${neto}" data-saldo="${resumenCaja().saldo-(etapaDe(k,e)==="cerrado"?(+e.fondoTuna||0):0)}"></div>
   ${k==="contrato"?`<label class="inline-check"><input type="checkbox" id="pagoOk" ${e.estado==="pagado"?"checked":""}> El cliente ya pagó</label>`:""}
   ${isTuno()?"":`<p class="chart-note">El reparto quedará «por aprobar» hasta que un tuno lo apruebe.</p>`}`}
   <button class="btn primary" type="submit">Guardar y cerrar</button></form>`}
@@ -843,6 +851,47 @@ function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.clien
   if(Lc.length)h+=`<div class="block"><h4>Locales donde más se toca</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Local</th><th class="num">Parches</th><th class="num">Pasadas</th></tr></thead><tbody>${
     Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
   return h}
+
+// ---------- caja de la Tuna ----------
+const CAT_CAJA={ingreso:["Cuotas","Donación","Venta","Saldo inicial","Otro ingreso"],egreso:["Cuerdas e instrumentos","Vestuario","Viajes y certámenes","Transporte","Alimentación","Otro gasto"]};
+function movimientosCaja(){
+  const ev=[...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e])].filter(([k,e])=>etapaDe(k,e)==="cerrado"&&e.reparto&&(+e.fondoTuna||0)!==0)
+    .map(([k,e])=>({id:"ev-"+e.id,fecha:e.fecha,tipo:"ingreso",monto:+e.fondoTuna||0,concepto:(k==="parche"?"Parche · ":"Contrato · ")+KIND[k].title(e),categoria:k==="parche"?"Fondo de parche":"Fondo de contrato",evento:[k,e.id],pendiente:!e.repartoAprobado}));
+  const man=S.caja.map(m=>({...m,monto:+m.monto||0,manual:true}));
+  const all=[...ev,...man].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")||(a.creado||"").localeCompare(b.creado||""));
+  let saldo=0;all.forEach(m=>{saldo+=m.tipo==="egreso"?-m.monto:m.monto;m.saldo=saldo});return all}
+function resumenCaja(){const all=movimientosCaja(),saldo=all.length?all[all.length-1].saldo:0;
+  const mes=todayStr().slice(0,7),delMes=all.filter(m=>(m.fecha||"").startsWith(mes));
+  return {all,saldo,ingMes:sum(delMes.filter(m=>m.tipo!=="egreso"),m=>m.monto),egrMes:sum(delMes.filter(m=>m.tipo==="egreso"),m=>m.monto),
+    deEventos:sum(all.filter(m=>m.evento),m=>m.monto),pend:all.filter(m=>m.pendiente).length}}
+function cajaHero(){const r=resumenCaja();
+  return `<button class="kpi hero caja-hero" data-caja><span>Caja de la Tuna · saldo actual</span><b class="${r.saldo<0?"neg":""}">${clp(r.saldo)}</b>
+    <small>Este mes: +${clp(r.ingMes)} · −${clp(r.egrMes)}${r.pend?` · ${r.pend} reparto${r.pend===1?"":"s"} por aprobar`:""} · Ver movimientos ›</small></button>`}
+function cajaSheet(){const r=resumenCaja(),all=r.all.slice().reverse();
+  const f0=r.all.map(m=>(m.fecha||"").slice(0,7)).filter(Boolean).sort()[0],meses=[];
+  if(f0){let [y,mm]=f0.split("-").map(Number);const fin=todayStr().slice(0,7);while(`${y}-${String(mm).padStart(2,"0")}`<=fin){meses.push(`${y}-${String(mm).padStart(2,"0")}`);if(++mm>12){mm=1;y++}}}
+  meses.splice(0,Math.max(0,meses.length-12));
+  let chart="";if(meses.length>1){const vals=meses.map(k=>{const ult=r.all.filter(m=>(m.fecha||"").slice(0,7)<=k);return ult.length?ult[ult.length-1].saldo:0});
+    chart=chartBlock("Saldo de la caja mes a mes",null,lineChart(meses.map(k=>MESES[+k.slice(5)-1]),[{name:"Saldo",color:"var(--gold)",values:vals}],fmtMoneyShort,i=>`${MESES_L[+meses[i].slice(5)-1]} ${meses[i].slice(0,4)}\nSaldo al cierre: ${clp(vals[i])}`),"Saldo acumulado al final de cada mes.")}
+  return `<h2>Caja de la Tuna</h2>
+  <div class="kpis"><div class="kpi hero"><span>Saldo actual</span><b class="${r.saldo<0?"neg":""}">${clp(r.saldo)}</b><small>${clp(r.deEventos)} aportado por parches y contratos</small></div>
+    <div class="kpi"><span>Ingresos del mes</span><b>${clp(r.ingMes)}</b></div><div class="kpi"><span>Gastos del mes</span><b>${clp(r.egrMes)}</b></div></div>
+  ${r.pend?`<div class="callout warn">${r.pend} aporte${r.pend===1?"":"s"} viene${r.pend===1?"":"n"} de repartos que un tuno aún no aprueba. Ya se cuentan en el saldo.</div>`:""}
+  ${chart}
+  ${isTuno()?`<div class="block"><h4>Registrar ingreso o gasto</h4><form class="f" id="cajaForm">
+    <div class="seg seg2"><button type="button" data-caja-tipo="ingreso" aria-pressed="true">Ingreso</button><button type="button" data-caja-tipo="egreso" aria-pressed="false">Gasto</button></div>
+    <input type="hidden" id="cjTipo" value="ingreso">
+    <div class="two"><div class="field"><label for="cjMonto">Monto ($)</label><input type="number" id="cjMonto" inputmode="numeric" min="1" required placeholder="Ej: 15000"></div>
+      <div class="field"><label for="cjFecha">Fecha</label><input type="date" id="cjFecha" required value="${todayStr()}"></div></div>
+    <div class="field"><label for="cjCat">Categoría</label><select class="input" id="cjCat">${CAT_CAJA.ingreso.map(c=>`<option>${c}</option>`).join("")}</select></div>
+    <div class="field"><label for="cjDet">Detalle</label><input type="text" id="cjDet" maxlength="100" required placeholder="Ej: Cuotas de noviembre, compra de cuerdas para bandurrias"></div>
+    <button class="btn primary" type="submit">Registrar</button></form></div>`:""}
+  <div class="block"><h4>Movimientos · ${all.length}</h4>${all.length?`<div class="caja-list">${all.map(m=>`<div class="caja-mov">
+    <div class="cm-main"><b>${esc(m.concepto||m.categoria||"Movimiento")}</b><small>${fmtDate(m.fecha)} · ${esc(m.categoria||"")}${m.pendiente?" · reparto por aprobar":""}${m.creadoPor?" · "+esc(nameOf(m.creadoPor)):""}</small></div>
+    <div class="cm-num"><b class="${m.tipo==="egreso"?"neg":"pos"}">${m.tipo==="egreso"?"−":"+"}${clp(m.monto)}</b><small>saldo ${clp(m.saldo)}</small></div>
+    ${m.evento?`<button class="chip-x" data-${m.evento[0]}="${esc(m.evento[1])}" aria-label="Ver evento">›</button>`:m.manual&&isTuno()?`<button class="chip-x" data-del-caja="${esc(m.id)}" aria-label="Eliminar movimiento">✕</button>`:""}</div>`).join("")}</div>`
+    :`<p class="muted-p">Aún no hay movimientos. Los aportes llegan solos al cerrar un parche o contrato con su reparto, y aquí puedes registrar cuotas, gastos o el saldo inicial.</p>`}</div>
+  ${isTuno()&&S.dl?`<button class="btn small" data-export="caja">Descargar movimientos (CSV)</button>`:""}`}
 
 // ---------- indicadores ----------
 const pad2=n=>String(n).padStart(2,"0");
@@ -879,11 +928,12 @@ function lineChart(labels,series,fmt,tip){const F=frame(labels,series.flatMap(s=
 function chartBlock(title,series,svg,note){return `<div class="block"><h4>${esc(title)}</h4>${series?`<div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.name)}</span>`).join("")}</div>`:""}${svg}${note?`<p class="chart-note">${esc(note)}</p>`:""}</div>`}
 function exportBlock(){if(!isTuno()||!S.dl)return"";
   return `<div class="block"><h4>Descargar registros</h4><p class="chart-note" style="margin:0 0 10px">Archivos CSV con todos los parches y contratos, para abrir en Excel o Google Sheets.</p>
-  <div class="export-row"><button class="btn small" data-export="parches">Parches (CSV)</button><button class="btn small" data-export="contratos">Contratos (CSV)</button></div></div>`}
+  <div class="export-row"><button class="btn small" data-export="parches">Parches (CSV)</button><button class="btn small" data-export="contratos">Contratos (CSV)</button><button class="btn small" data-export="caja">Caja (CSV)</button></div></div>`}
 function viewKpi(){
   if(!S.ready.p||!S.ready.c)return loadingHtml;
   const per=[["3m","3 meses"],["6m","6 meses"],["anio","Este año"],["todo","Todo"]],ini=periodStart(),hoy=todayStr();
   let h=`<div class="section-head"><h2>Indicadores</h2><span>desde ${fmtDate(ini)}</span></div>
+  <div class="kpis">${cajaHero()}</div>
   <div class="filters">${per.map(([k,l])=>`<button class="chip" data-kper="${k}" aria-pressed="${S.kpiPeriodo===k}">${l}</button>`).join("")}</div>`;
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
@@ -934,7 +984,9 @@ function viewKpi(){
 async function exportCsv(kind){
   const dl=S.dl;if(!dl){toast("La descarga no está disponible aquí.");return}
   let rows;const names=e=>(e.asistentes||[]).map(nameOf).join(", ");
-  if(kind==="parches"){rows=[["Fecha","Hora","Lugar","Total recaudado","Gastos","Detalle gastos","Neto","N° asistentes","Por asistente","Asistentes",...DENOMS.map(d=>"Cantidad $"+d)]];
+  if(kind==="caja"){rows=[["Fecha","Tipo","Categoría","Detalle","Monto","Saldo","Registrado por"]];
+    movimientosCaja().forEach(m=>rows.push([m.fecha,m.tipo==="egreso"?"Gasto":"Ingreso",m.categoria||"",m.concepto||"",m.tipo==="egreso"?-m.monto:m.monto,m.saldo,m.creadoPor?nameOf(m.creadoPor):"Automático"]))}
+  else if(kind==="parches"){rows=[["Fecha","Hora","Lugar","Total recaudado","Gastos","Detalle gastos","Neto","N° asistentes","Por asistente","Asistentes",...DENOMS.map(d=>"Cantidad $"+d)]];
     S.parches.slice().sort(byFecha).forEach(p=>{const n=att(p);rows.push([p.fecha,p.hora||"",p.lugar||"",parcheTotal(p),+p.gastos||0,p.gastosDetalle||"",parcheNeto(p),n,n?Math.round(parcheNeto(p)/n):"",names(p),...DENOMS.map(d=>+(p.conteo||{})["d"+d]||0)])})}
   else{rows=[["Fecha","Hora","Cliente","Tipo","Estado","Lugar","Monto cobrado","Total costos","Detalle costos","Utilidad","N° integrantes","Integrantes"]];
     S.contratos.slice().sort(byFecha).forEach(c=>rows.push([c.fecha,c.hora||"",c.cliente||"",c.tipo||"",ESTADOS_CONTRATO[c.estado]||"",c.lugar||"",+c.monto||0,costosTotal(c),(c.costos||[]).map(x=>x.concepto+": "+x.monto).join(" | "),contratoUtil(c),att(c),names(c)]))}
@@ -1117,7 +1169,7 @@ function joinView(){
 function renderSheet(){
   const L=$("#layer");if(!S.sheet){L.innerHTML="";return}
   // no re-dibujar formularios abiertos mientras se escribe
-  if(!["task","parche","contrato","presentacion","llamado"].includes(S.sheet.type)&&L.firstChild)return;
+  if(!["task","parche","contrato","presentacion","llamado","caja"].includes(S.sheet.type)&&L.firstChild)return;
   const scroll=L.querySelector(".sheet")?.scrollTop||0;
   // conserva lo que se está escribiendo cuando llegan datos nuevos
   const keep={};L.querySelectorAll("input[id],textarea[id],select[id]").forEach(x=>{if(x.type!=="checkbox")keep[x.id]=x.value});
@@ -1135,6 +1187,7 @@ function renderSheet(){
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
   else if(S.sheet.type==="presForm")inner=presForm(S.sheet);
   else if(S.sheet.type==="cierreForm")inner=cierreForm(S.sheet);
+  else if(S.sheet.type==="caja")inner=cajaSheet();
   else if(S.sheet.type==="parcheForm")inner=parcheForm(S.sheet);
   else if(S.sheet.type==="contratoForm")inner=contratoForm(S.sheet);
   L.innerHTML=`<div class="overlay" data-backdrop><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div><button class="close" data-close aria-label="Cerrar">×</button>${inner}</div></div>`;
@@ -1275,6 +1328,10 @@ document.addEventListener("submit",async e=>{
     const x={local:nom,veces:Math.max(1,Math.round(+$("#lcVeces").value||1)),nota:$("#lcNota").value.trim(),at:new Date().toISOString(),por:S.myId};
     $("#lcNombre").value="";$("#lcNota").value="";$("#lcVeces").value="1";
     await safe(()=>S.db.doc("parches/"+pid).update({paradas:firebase.firestore.FieldValue.arrayUnion(x)}),"Local agregado");return}
+  if(f.id==="cajaForm"){const monto=Math.round(+$("#cjMonto").value||0);if(monto<=0){toast("Escribe un monto mayor a cero.");return}
+    const t=$("#cjTipo").value,data={tipo:t,monto,fecha:$("#cjFecha").value,categoria:$("#cjCat").value,concepto:$("#cjDet").value.trim(),creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()};
+    $("#cjMonto").value="";$("#cjDet").value="";
+    await safe(()=>S.db.doc("caja/"+uid()).set(data),t==="egreso"?"Gasto registrado":"Ingreso registrado");return}
   if(f.id==="instForm"){const sel=[...f.querySelectorAll("input[name=inst]:checked")].map(i=>i.value),pr=$("#instPrin").value;
     const list=[pr,...sel.filter(x=>x!==pr)];
     await safe(()=>S.db.doc("miembros/"+S.myId).update({instrumentos:list}),"Instrumentos guardados");return}
@@ -1323,6 +1380,10 @@ document.addEventListener("click",async e=>{
   if("logout" in ds){firebase.auth().signOut();return}
   if(ds.nav){S.view=ds.nav;closeSheet();render();window.scrollTo(0,0);return}
   if(ds.evtab){S.evTab=ds.evtab;render();return}
+  if("caja" in ds){openSheet({type:"caja"});return}
+  if(ds.cajaTipo){const t=ds.cajaTipo;$("#cjTipo").value=t;document.querySelectorAll("[data-caja-tipo]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.cajaTipo===t));
+    $("#cjCat").innerHTML=CAT_CAJA[t].map(c=>`<option>${c}</option>`).join("");return}
+  if(ds.delCaja){const id=ds.delCaja;openSheet({type:"confirm",title:"¿Eliminar el movimiento?",text:"Se quitará de la caja y el saldo se recalculará.",yes:"Eliminar",run:async()=>{await S.db.doc("caja/"+id).delete();openSheet({type:"caja"})}});return}
   if(ds.presentacion){e.preventDefault();openSheet({type:"presentacion",id:ds.presentacion});return}
   if(ds.editPres){openSheet({type:"presForm",id:ds.editPres});return}
   if(ds.delPres){const id=ds.delPres;openSheet({type:"confirm",title:"¿Eliminar la presentación?",text:"Se borrará con su convocatoria, repertorio y cierre. Esto no se puede deshacer.",yes:"Eliminar",run:()=>S.db.doc("presentaciones/"+id).delete()});return}
