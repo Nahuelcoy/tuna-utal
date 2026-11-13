@@ -418,8 +418,9 @@ const me = ()=>S.members[S.myId]||null;
 const grado = id=>S.members[id]?.grado||null;
 function nameOf(id){const m=S.members[id];if(m&&m.apodo)return m.apodo;return (S.profiles[id]&&S.profiles[id].name)||"Integrante"}
 function initials(n){return n.split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase()||"?"}
-function canAssignTo(target){const g=me()?.grado,tg=grado(target);if(!g||!tg)return false;if(g==="tuno")return true;if(g==="pardillo")return tg==="pardillo"||tg==="aspirante";return false}
-const canCreate = ()=>["tuno","pardillo"].includes(me()?.grado);
+function canAssignTo(target){const g=me()?.grado,tg=grado(target);if(!g||!tg)return false;if(g==="tuno")return true;if(g==="pardillo")return ["tuno","pardillo","aspirante"].includes(tg);if(g==="aspirante")return target===S.myId&&antiguedadOk(S.myId);return false}
+// Aspirantes con 2 meses o más pueden autoasignarse tareas (las ven tunos y pardillos).
+const canCreate = ()=>["tuno","pardillo"].includes(me()?.grado)||(me()?.grado==="aspirante"&&antiguedadOk(S.myId));
 const isAssigned = t=>(t.asignados||[]).includes(S.myId);
 function canState(t){const g=me()?.grado;if(g==="tuno"||g==="pardillo")return true;return g==="aspirante"&&isAssigned(t)}
 const canNote = canState;
@@ -495,13 +496,14 @@ function subscribeAll(fs){
 }
 // Tareas: los tunos ven todas; pardillos y aspirantes solo las que no son exclusivas de tunos.
 let tareasModo=null,tareasUnsub=null;const backfilled=new Set();
-const visDe=asg=>(asg||[]).length&&(asg||[]).every(id=>grado(id)==="tuno")?"tunos":"todos";
+// "Solo tunos" únicamente si la crea un tuno y todos los asignados son tunos; si la crea un pardillo, la sigue viendo él.
+const visDe=(asg,por)=>grado(por)==="tuno"&&(asg||[]).length&&(asg||[]).every(id=>grado(id)==="tuno")?"tunos":"todos";
 function subTareas(fs){const modo=isTuno()?"todas":me()?"todos":null;if(!modo||modo===tareasModo)return;
   tareasModo=modo;if(tareasUnsub){try{tareasUnsub()}catch(e){}}
   const q=modo==="todas"?fs.collection("tareas"):fs.collection("tareas").where("visibilidad","==","todos");
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   tareasUnsub=q.onSnapshot(snap=>{S.tasks=mine(snap);S.ready.t=true;
-    if(modo==="todas")S.tasks.forEach(t=>{const v=visDe(t.asignados);if(t.visibilidad!==v&&!backfilled.has(t.id+v)){backfilled.add(t.id+v);fs.doc("tareas/"+t.id).update({visibilidad:v}).catch(()=>{})}});
+    if(modo==="todas")S.tasks.forEach(t=>{const v=visDe(t.asignados,t.creadoPor);if(t.visibilidad!==v&&!backfilled.has(t.id+v)){backfilled.add(t.id+v);fs.doc("tareas/"+t.id).update({visibilidad:v}).catch(()=>{})}});
     render()},()=>{S.ready.t=true;render()});
   unsubs.push(()=>{if(tareasUnsub)tareasUnsub();tareasUnsub=null;tareasModo=null})}
 // Llamados: cada uno ve los dirigidos a su grado ("todos", "tunos_pardillos" o "tunos").
@@ -591,11 +593,11 @@ function showChrome(){
 function taskCard(t){
   const d=dueInfo(t);const asg=(t.asignados||[]).map(nameOf).join(", ")||"Sin asignar";
   const subs=S.tasks.filter(x=>x.padre===t.id).length;
-  return `<button class="task p-${esc(t.prioridad||"media")} ${t.estado==="realizada"?"done":""} ${visDe(t.asignados)==="tunos"?"solo-card":""}" data-open="${esc(t.id)}">
+  return `<button class="task p-${esc(t.prioridad||"media")} ${t.estado==="realizada"?"done":""} ${visDe(t.asignados,t.creadoPor)==="tunos"?"solo-card":""}" data-open="${esc(t.id)}">
     <span class="stripe"></span><span class="body">
       <span class="row"><span class="cat">${esc(t.categoria||"Otra")}</span><span class="pill st-${esc(t.estado)}">${ESTADOS[t.estado]||"Pendiente"}</span>${t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente"?'<span class="pill pl-pend">Plazo solicitado</span>':""}</span>
       <h3>${esc(t.titulo)}</h3>
-      <span class="meta">${visDe(t.asignados)==="tunos"?'<span class="solo-tunos">🔒 Solo tunos</span>':""}<span class="due ${d.cls}">${d.txt}</span><span>👤 ${esc(asg)}</span>${subs?`<span>${subs} subtarea${subs>1?"s":""}</span>`:""}</span>
+      <span class="meta">${visDe(t.asignados,t.creadoPor)==="tunos"?'<span class="solo-tunos">🔒 Solo tunos</span>':""}<span class="due ${d.cls}">${d.txt}</span><span>👤 ${esc(asg)}</span>${subs?`<span>${subs} subtarea${subs>1?"s":""}</span>`:""}</span>
     </span></button>`}
 function sortTasks(arr){const pr={alta:0,media:1,baja:2};return arr.slice().sort((a,b)=>{
   if((a.estado==="realizada")!==(b.estado==="realizada"))return a.estado==="realizada"?1:-1;
@@ -1378,9 +1380,10 @@ function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<d
   else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
     h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`;
     if(subcVigente(kind,ev))h+=`<div class="subc-btn"><button class="btn small gold" data-subc="${kind}:${esc(ev.id)}">📖 Abrir sub-cancionero</button></div>`}
-  const puedeEd=kind==="llamado"?isTuno():canEditEv(kind,ev)&&etapaDe(kind,ev)!=="cerrado";
+  // El repertorio lo define un tuno; pardillos y aspirantes lo proponen y un tuno decide.
+  const puedeEd=kind==="llamado"?isTuno():isTuno()&&etapaDe(kind,ev)!=="cerrado";
   if(puedeEd)h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
-  else if(kind!=="llamado"&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small" style="margin-top:12px" data-rep-sug="${kind}:${esc(ev.id)}">Sugerir repertorio</button>`;
+  else if(kind!=="llamado"&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small" style="margin-top:12px" data-rep-sug="${kind}:${esc(ev.id)}">Proponer canciones</button><p class="muted-p" style="margin-top:6px">Un tuno revisa la propuesta y decide si se usa.</p>`;
   const sg=kind==="llamado"?[]:S.sugerencias.filter(x=>x.evento===ev.id&&x.kind===kind);
   if(sg.length)h+=`<p class="rep-g">Sugerencias · ${sg.length}</p>${sg.map(x=>{const L=(x.repertorio||[]).filter(t=>t.id);
     return `<details class="sug"><summary><b>${esc(nameOf(x.autor))}</b> · ${L.length} canciones · ${fmtTs(x.fecha)}</summary><ol>${L.map(t=>`<li>${esc(t.titulo)} <small>${esc(t.ritmo)}</small></li>`).join("")}</ol>
@@ -1545,7 +1548,7 @@ function taskForm(o){
     <div class="field"><label for="tFecha">Fecha límite</label><input type="date" id="tFecha" required value="${esc(v.fechaLimite)}" ${parent?`max="${esc(parent.fechaLimite)}"`:""}>
       ${t&&t.fechaLimiteOriginal&&t.fechaLimiteOriginal!==t.fechaLimite?`<span class="hint">Plazo original: ${fmtDate(t.fechaLimiteOriginal)}</span>`:""}</div>
     <div class="field"><label>Asignar a</label>
-      ${me().grado==="pardillo"?`<span class="hint">Como pardillo puedes asignar a pardillos y aspirantes.</span>`:""}
+      ${me().grado==="pardillo"?`<span class="hint">Como pardillo puedes asignar a tunos, pardillos y aspirantes.</span>`:me().grado==="aspirante"?`<span class="hint">Como aspirante puedes asignarte tareas a ti mismo. Las verán los tunos y pardillos.</span>`:""}
       <div class="checks">${ids.length?ids.map(id=>`<label><input type="checkbox" name="asg" value="${esc(id)}" ${(v.asignados||[]).includes(id)?"checked":""} ${canAssignTo(id)?"":"disabled"}> ${esc(nameOf(id))}${id===S.myId?" (tú)":""} <span class="grado g-${grado(id)}" style="margin-left:auto">${GRADOS[grado(id)]}</span></label>`).join(""):`<span style="padding:8px;color:var(--muted)">No hay integrantes a quienes puedas asignar.</span>`}</div></div>
     <button class="btn primary" type="submit">${t?"Guardar cambios":"Crear tarea"}</button>
   </form>`}
@@ -1577,7 +1580,7 @@ document.addEventListener("submit",async e=>{
     const o=S.sheet;const asg=[...f.querySelectorAll('input[name=asg]:checked')].map(i=>i.value);
     const fecha=$("#tFecha").value;const parent=o.padre&&S.tasks.find(x=>x.id===o.padre);
     if(parent&&fecha>parent.fechaLimite){toast("La subtarea no puede vencer después que la tarea principal.");return}
-    const data={titulo:$("#tTitulo").value.trim(),descripcion:$("#tDesc").value.trim(),categoria:$("#tCat").value,prioridad:$("#tPrio").value,fechaLimite:fecha,asignados:asg,visibilidad:visDe(asg)};
+    const data={titulo:$("#tTitulo").value.trim(),descripcion:$("#tDesc").value.trim(),categoria:$("#tCat").value,prioridad:$("#tPrio").value,fechaLimite:fecha,asignados:asg,visibilidad:visDe(asg,o.id?(S.tasks.find(x=>x.id===o.id)||{}).creadoPor||S.myId:S.myId)};
     if(o.id){const t=S.tasks.find(x=>x.id===o.id);if(t&&fecha!==t.fechaLimite&&!isTuno()&&t.creadoPor===S.myId){/* el creador puede ajustar */}
       await safe(()=>tref(o.id).update({...data,actualizado:new Date().toISOString()}),"Cambios guardados");openSheet({type:"task",id:o.id})}
     else{const id=uid();await safe(()=>tref(id).set({...data,estado:"pendiente",fechaLimiteOriginal:fecha,creadoPor:S.myId,agrupacion:AGRUPACION,padre:o.padre||null,notas:[],solicitudPlazo:null,creado:new Date().toISOString()}),"Tarea creada");
