@@ -235,6 +235,31 @@ table.kt .num{text-align:right}
 .hdr-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
 .hdr-btn .badge{top:-5px;left:auto;right:-5px}
 .seg.seg2{grid-template-columns:1fr 1fr}
+.steps{list-style:none;display:flex;gap:4px;margin:0 0 12px;padding:0;counter-reset:s}
+.steps li{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--muted);text-align:center;position:relative}
+.steps li span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--line);font-size:12px;font-weight:700;z-index:1}
+.steps li:not(:first-child)::before{content:"";position:absolute;top:12px;right:50%;width:100%;height:2px;background:var(--line)}
+.steps li.done span{background:var(--ok);border-color:var(--ok);color:#fff}.steps li.done::before,.steps li.now::before{background:var(--ok)}
+.steps li.now{color:var(--ink)}.steps li.now span{border-color:var(--gold);background:var(--gold-soft);color:var(--gold-ink)}
+.quorum{display:flex;flex-wrap:wrap;gap:6px}
+.quorum span{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:999px;font-variant-numeric:tabular-nums}
+.quorum .ok{background:var(--ok-soft);color:var(--ok)}.quorum .no{background:var(--bad-soft);color:var(--bad)}
+.my-rsvp{margin:10px 0 4px;padding:10px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+.rsvp-row,.add-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.rsvp-row select,.add-row select{flex:1 1 140px;min-width:0}
+.chip-x{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 0 0 4px;font-size:13px}
+.att-chip small{color:var(--muted)}
+.add-local{display:grid;grid-template-columns:minmax(0,1fr) 64px auto;gap:6px;margin-top:10px}
+.add-local .full{grid-column:1/-1}
+.add-local input{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;min-height:40px}
+.conc-row{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-bottom:1px solid var(--line)}.conc-row:last-of-type{border-bottom:0}
+.reparto{display:flex;flex-direction:column;gap:6px}
+.rep-p{display:flex;align-items:center;gap:10px;font-size:14px}.rep-p span{flex:1;min-width:0}
+.rep-p input{width:130px;text-align:right;font-variant-numeric:tabular-nums}
+.inst-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px 10px}
+.inst-op{display:flex;align-items:center;gap:8px;font-size:14px;padding:4px 0;cursor:pointer}.inst-op input{width:18px;height:18px;accent-color:var(--wine)}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.stage{border-color:var(--gold);background:var(--gold-soft)}
 .rep-row{display:flex;gap:10px;align-items:flex-end}
 .rep-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 .rep-row .rep-n{margin-bottom:10px}
@@ -294,14 +319,16 @@ const SLOT = {
   any:{label:"Cualquier canción",ok:()=>true},
   bis:{label:"Bis",ok:()=>true}};
 const PLANTILLAS = {
-  perutaly:{nombre:"Parche «Perutaly» (rondas de 3)",param:"Rondas",def:4,
-    build:n=>{const s=[];for(let i=1;i<=n;i++)["paso","libre","bovals"].forEach(t=>s.push({tipo:t,grupo:"Ronda "+i}));return s}},
-  duracion:{nombre:"Contrato por duración",param:"Minutos de show",def:45,
-    build:m=>Array.from({length:Math.max(1,Math.round(m/3.75))},()=>({tipo:"any",grupo:"Show de "+m+" min"}))},
-  presentacion:{nombre:"Presentación o encuentro (+ bis)",param:"Canciones",def:5,
-    build:n=>[...Array.from({length:n},()=>({tipo:"any",grupo:"Presentación"})),{tipo:"bis",grupo:"Bis"}]},
-  libre:{nombre:"Lista libre",param:"Canciones",def:10,build:n=>Array.from({length:n},()=>({tipo:"any",grupo:"Repertorio"}))}};
-const DEF_PLANTILLA = {parche:"perutaly",contrato:"duracion",llamado:"presentacion"};
+  perutaly:{nombre:"Parche «Perutaly» (rondas de 3)",params:[{n:"Rondas",d:4}],
+    build:([n])=>{const s=[];for(let i=1;i<=n;i++)["paso","libre","bovals"].forEach(t=>s.push({tipo:t,grupo:"Ronda "+i}));return s}},
+  duracion:{nombre:"Contrato por duración",params:[{n:"Minutos de show",d:45}],
+    build:([m])=>Array.from({length:Math.max(1,Math.round(m/3.75))},()=>({tipo:"any",grupo:"Show de "+m+" min"}))},
+  presentacion:{nombre:"Presentación o encuentro",params:[{n:"Show principal",d:5},{n:"Bis",d:1},{n:"Show secundario",d:0},{n:"Pasacalles",d:0}],
+    build:([a,b,c,d])=>[["Show principal",a,"any"],["Bis",b,"bis"],["Show secundario",c,"any"],["Pasacalles",d,"any"]].flatMap(([g,n,t])=>Array.from({length:n||0},()=>({tipo:t,grupo:g})))},
+  libre:{nombre:"Lista libre",params:[{n:"Canciones",d:10}],build:([n])=>Array.from({length:Math.max(1,n)},()=>({tipo:"any",grupo:"Repertorio"}))}};
+const DEF_PLANTILLA = {parche:"perutaly",contrato:"duracion",presentacion:"presentacion",llamado:"presentacion"};
+function paramInputs(pl,vals){return PLANTILLAS[pl].params.map((p,i)=>`<div class="field"><label for="rP${i}">${esc(p.n)}</label><input type="number" inputmode="numeric" min="0" max="120" id="rP${i}" value="${vals&&vals[i]!=null?vals[i]:p.d}"></div>`).join("")}
+function readParams(pl){return PLANTILLAS[pl].params.map((p,i)=>{const v=$("#rP"+i),n=v&&v.value!==""?+v.value:p.d;return Math.max(0,Math.min(120,Math.round(n||0)))})}
 const DIAS = ["dom","lun","mar","mié","jue","vie","sáb"];
 const clp = n=>(n<0?"−$":"$")+Math.abs(Math.round(+n||0)).toLocaleString("es-CL");
 const sum = (a,f)=>a.reduce((s,x)=>s+(+f(x)||0),0);
@@ -311,8 +338,8 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],contratos:[],llamados:[],respuestas:[],dl:null,view:"tareas",tareasTab:"mias",kpiPeriodo:"6m",
-  filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false},error:null,myRequest:null};
+  parches:[],contratos:[],presentaciones:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
 const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -378,8 +405,8 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
-      ready:{m:!u,t:false,p:false,c:false,l:false}});
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],presentaciones:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+      ready:{m:!u,t:false,p:false,c:false,l:false,pr:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
     try{await fs.doc("adminCheck/"+u.uid).get();S.isOwner=true}catch(e){S.isOwner=false}
@@ -399,6 +426,7 @@ function subscribeAll(fs){
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
   unsubs.push(fs.collection("tareas").onSnapshot(snap=>{S.tasks=mine(snap);S.ready.t=true;render()},()=>{S.ready.t=true;render()}));
   unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parches=mine(snap);S.ready.p=true;render()},()=>{S.ready.p=true;render()}));
+  unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
   // llamados y respuestas: solo los últimos 90 días, para cuidar el límite gratuito de lecturas
   const cut=daysAgo(90);
@@ -421,8 +449,7 @@ function render(){
   showChrome();
   if(S.view==="tareas")app.innerHTML=viewTareas();
   else if(S.view==="llamados")app.innerHTML=viewLlamados();
-  else if(S.view==="parches")app.innerHTML=viewParches();
-  else if(S.view==="contratos")app.innerHTML=viewContratos();
+  else if(S.view==="eventos")app.innerHTML=viewEventos();
   else if(S.view==="kpi")app.innerHTML=viewKpi();
   else if(S.view==="gente")app.innerHTML=viewPeople();
   renderSheet();
@@ -430,17 +457,18 @@ function render(){
 function hideChrome(){$("#nav").hidden=true;$("#fab").hidden=true;$("#hdrPeople").hidden=true}
 function showChrome(){
   $("#nav").hidden=false;
-  const fabOn=S.view==="tareas"?canCreate():["parches","contratos","llamados"].includes(S.view)?isTuno():false;
-  $("#fab").hidden=!fabOn;$("#fab").setAttribute("aria-label",S.view==="parches"?"Nuevo parche":S.view==="contratos"?"Nuevo contrato":S.view==="llamados"?"Nuevo llamado":"Nueva tarea");
+  const fabOn=S.view==="tareas"?canCreate():S.view==="eventos"?isOrg():S.view==="llamados"?isTuno():false;
+  $("#fab").hidden=!fabOn;$("#fab").setAttribute("aria-label",S.view==="eventos"?(S.evTab==="contratos"?"Nuevo contrato":S.evTab==="presentaciones"?"Nueva presentación":"Nuevo parche"):S.view==="llamados"?"Nuevo llamado":"Nueva tarea");
   const pend=S.tasks.filter(t=>t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente").length;
   const ic={tareas:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>',
     llamados:'<svg viewBox="0 0 24 24"><path d="M3 10v4h3l7 5V5l-7 5z"/><path d="M16.5 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11"/></svg>',
+    eventos:'<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>',
     parches:'<svg viewBox="0 0 24 24"><ellipse cx="9" cy="6.5" rx="6" ry="2.5"/><path d="M3 6.5v4c0 1.4 2.7 2.5 6 2.5s6-1.1 6-2.5v-4M3 10.5v4c0 1.4 2.7 2.5 6 2.5"/><circle cx="17" cy="16" r="4.5"/></svg>',
     contratos:'<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
     kpi:'<svg viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-6M2 20h20"/></svg>',
     gente:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-6-5-6.5"/></svg>'};
-  const items=[["tareas","Tareas"],["llamados","Llamados"],["parches","Parches"],["contratos","Contratos"],["kpi","Indicadores"]];
-  const pendL=S.llamados.filter(l=>llamadoAbierto(l)&&!miResp(l.id)).length;
+  const items=[["tareas","Tareas"],["llamados","Llamados"],["eventos","Eventos"],["kpi","Indicadores"]];
+  const av=avisosPendientes(),pendL=S.llamados.filter(l=>llamadoAbierto(l)&&!miResp(l.id)).length+av.conv.length+av.conf.length;
   const reqBadge=canManage()&&S.requests.length?S.requests.length:0;
   const hp=$("#hdrPeople");hp.hidden=false;hp.setAttribute("aria-pressed",S.view==="gente");const hb=$("#hdrBadge");hb.hidden=!reqBadge;hb.textContent=reqBadge;
   $("#navInner").innerHTML=items.map(([k,l])=>`<button data-nav="${k}" ${S.view===k?'aria-current="page"':""}>${ic[k]}${l}${k==="tareas"&&pend&&isTuno()?`<span class="badge">${pend}</span>`:""}${k==="llamados"&&pendL?`<span class="badge">${pendL}</span>`:""}</button>`).join("");
@@ -510,18 +538,18 @@ function viewTareas(){
 const loadingHtml=`<div class="empty"><strong>Cargando…</strong></div>`;
 const att=e=>(e.asistentes||[]).length;
 function fmtDateDia(s){if(!s)return"—";const [y,m,d]=s.split("-").map(Number);return DIAS[new Date(Date.UTC(y,m-1,d)).getUTCDay()]+" "+fmtDate(s)}
-const esProgramado=p=>!!p.fecha&&(p.fecha>todayStr()||(p.fecha===todayStr()&&!parcheTotal(p)));
-const contratoAbierto=c=>(c.fecha||"")>=todayStr()&&!["cancelado","realizado","pagado"].includes(c.estado);
+const esProgramado=p=>["convocatoria","confirmado"].includes(etapaDe("parche",p));
+const contratoAbierto=c=>["convocatoria","confirmado"].includes(etapaDe("contrato",c));
 const byFecha=(a,b)=>(a.fecha||"").localeCompare(b.fecha||"");
 
 function parcheCard(p){const prog=esProgramado(p),n=att(p),yo=(p.asistentes||[]).includes(S.myId);
   return `<button class="task" data-parche="${esc(p.id)}"><span class="stripe" style="background:var(--s-parche)"></span><span class="body">
-    <span class="row"><span class="cat">${fmtDateDia(p.fecha)}${p.hora?" · "+esc(p.hora):""}</span>${prog?'<span class="pill st-en_curso">Programado</span>':parcheTotal(p)?'<span class="pill st-realizada">Contado</span>':'<span class="pill pl-pend">Sin conteo</span>'}${yo?'<span class="pill me-pill">Vas</span>':""}</span>
+    <span class="row"><span class="cat">${fmtDateDia(p.fecha)}${p.hora?" · "+esc(p.hora):""}</span>${ETAPA_PILL[etapaDe("parche",p)]||""}${miPill("parche",p)}</span>
     <h3>${esc(p.lugar||"Parche")}</h3>
     <span class="meta"><span>${n} asistente${n===1?"":"s"}</span>${prog?"":`<span class="money">${clp(parcheNeto(p))} neto</span>${n?`<span>${clp(parcheNeto(p)/n)} c/u</span>`:""}`}</span></span></button>`}
 function contratoCard(c){const n=att(c),yo=(c.asistentes||[]).includes(S.myId);
   return `<button class="task" data-contrato="${esc(c.id)}"><span class="stripe" style="background:var(--s-contrato)"></span><span class="body">
-    <span class="row"><span class="cat">${esc(c.tipo||"Otro")}</span><span class="pill ce-${esc(c.estado)}">${ESTADOS_CONTRATO[c.estado]||""}</span>${yo?'<span class="pill me-pill">Vas</span>':""}</span>
+    <span class="row"><span class="cat">${esc(c.tipo||"Otro")}</span>${ETAPA_PILL[etapaDe("contrato",c)]||""}${miPill("contrato",c)}</span>
     <h3>${esc(c.cliente||"Contrato")}</h3>
     <span class="meta"><span>${fmtDateDia(c.fecha)}${c.hora?" · "+esc(c.hora):""}</span><span>${n} integrante${n===1?"":"s"}</span><span class="money">${clp(c.monto)}</span>${costosTotal(c)?`<span>Utilidad ${clp(contratoUtil(c))}</span>`:""}</span></span></button>`}
 
@@ -533,9 +561,11 @@ function viewParches(){
   const mesP=hechos.filter(p=>(p.fecha||"").startsWith(mes));const neto=sum(mesP,parcheNeto),a=sum(mesP,att);
   let h=`<div class="section-head"><h2>Parches</h2><span>${MESES_L[+mes.slice(5)-1]}</span></div>
   <div class="summary"><div><b class="m">${clp(neto)}</b><span>neto del mes</span></div><div><b>${mesP.length}</b><span>parches del mes</span></div><div><b class="m">${a?clp(neto/a):"—"}</b><span>por asistente</span></div></div>`;
-  if(!S.parches.length)return h+`<div class="empty"><strong>Aún no hay parches registrados</strong>${isTuno()?"Toca el botón dorado + para programar un parche o registrar el conteo de uno que ya se hizo.":"Cuando un tuno programe un parche, aparecerá aquí para que te anotes."}</div>`;
-  if(prox.length)h+=`<p class="group-label">Próximos · anótate</p><div class="list">${prox.map(parcheCard).join("")}</div>`;
-  if(hechos.length)h+=`<p class="group-label">Realizados</p><div class="list">${hechos.map(parcheCard).join("")}</div>`;
+  if(!S.parches.length)return h+`<div class="empty"><strong>Aún no hay parches</strong>${isOrg()?"Toca el botón dorado + para convocar un parche.":"Cuando se convoque un parche, aparecerá aquí para que respondas si vas."}</div>`;
+  const porCerrar=hechos.filter(p=>etapaDe("parche",p)==="realizado"),hist=hechos.filter(p=>etapaDe("parche",p)!=="realizado");
+  if(prox.length)h+=`<p class="group-label">Convocatorias y próximos</p><div class="list">${prox.map(parcheCard).join("")}</div>`;
+  if(porCerrar.length)h+=`<p class="group-label">Por cerrar</p><div class="list">${porCerrar.map(parcheCard).join("")}</div>`;
+  if(hist.length)h+=`<p class="group-label">Historial</p><div class="list">${hist.map(parcheCard).join("")}</div>`;
   return h}
 function viewContratos(){
   if(!S.ready.c)return loadingHtml;
@@ -546,9 +576,11 @@ function viewContratos(){
   const porCobrar=sum(S.contratos.filter(c=>c.estado==="realizado"),c=>c.monto);
   let h=`<div class="section-head"><h2>Contratos</h2><span>${y}</span></div>
   <div class="summary"><div><b class="m">${clp(sum(anio,contratoUtil))}</b><span>utilidad del año</span></div><div><b>${anio.length}</b><span>realizados</span></div><div class="${porCobrar?"alert":""}"><b class="m">${clp(porCobrar)}</b><span>por cobrar</span></div></div>`;
-  if(!S.contratos.length)return h+`<div class="empty"><strong>Aún no hay contratos</strong>${isTuno()?"Toca el botón dorado + para registrar un contrato con su monto y costos.":"Cuando un tuno registre un contrato, aparecerá aquí para que te anotes."}</div>`;
-  if(prox.length)h+=`<p class="group-label">Próximos · anótate</p><div class="list">${prox.map(contratoCard).join("")}</div>`;
-  if(resto.length)h+=`<p class="group-label">Historial</p><div class="list">${resto.map(contratoCard).join("")}</div>`;
+  if(!S.contratos.length)return h+`<div class="empty"><strong>Aún no hay contratos</strong>${isOrg()?"Toca el botón dorado + para registrar un contrato y convocar.":"Cuando se convoque un contrato, aparecerá aquí para que respondas si vas."}</div>`;
+  const porCerrarC=resto.filter(c=>etapaDe("contrato",c)==="realizado"),histC=resto.filter(c=>etapaDe("contrato",c)!=="realizado");
+  if(prox.length)h+=`<p class="group-label">Convocatorias y próximos</p><div class="list">${prox.map(contratoCard).join("")}</div>`;
+  if(porCerrarC.length)h+=`<p class="group-label">Por cerrar</p><div class="list">${porCerrarC.map(contratoCard).join("")}</div>`;
+  if(histC.length)h+=`<p class="group-label">Historial</p><div class="list">${histC.map(contratoCard).join("")}</div>`;
   return h}
 
 function asistentesBlock(ev,kind){const ids=ev.asistentes||[],yo=ids.includes(S.myId);
@@ -556,51 +588,22 @@ function asistentesBlock(ev,kind){const ids=ev.asistentes||[],yo=ids.includes(S.
   return `<div class="block"><h4>${abierto?"Anotados":"Asistieron"} · ${ids.length}</h4>
   ${ids.length?`<div class="att">${ids.map(id=>`<span class="att-chip"><span class="dot g-${grado(id)||"x"}"></span>${esc(nameOf(id))}</span>`).join("")}</div>`:`<p class="muted-p">Nadie anotado todavía.</p>`}
   ${!abierto?"":yo||antiguedadOk(S.myId)?`<button class="btn small ${yo?"":"gold"}" style="margin-top:10px" data-anotar="${kind}:${esc(ev.id)}">${yo?"Ya no voy":"Anotarme"}</button>`:`<p class="muted-p" style="margin-top:10px">Llevas menos de 2 meses como aspirante: un tuno debe sumarte.</p>`}</div>`}
-function parcheDetail(p){
-  const tot=parcheTotal(p),g=+p.gastos||0,neto=tot-g,n=att(p),prog=esProgramado(p),ct=p.conteo||{};
-  const rows=DENOMS.filter(d=>+ct["d"+d]).map(d=>`<tr><td>${d>=1000?"Billetes":"Monedas"} de ${clp(d)}</td><td class="num">× ${ct["d"+d]}</td><td class="num">${clp(d*ct["d"+d])}</td></tr>`).join("");
-  return `<h2>${esc(p.lugar||"Parche")}</h2>
-  <div class="block"><dl class="kv"><dt>Fecha</dt><dd>${fmtDateDia(p.fecha)}${p.hora?", "+esc(p.hora):""}</dd><dt>Registrado por</dt><dd>${esc(nameOf(p.creadoPor))}</dd></dl>${p.notas?`<p class="desc" style="margin-top:10px">${esc(p.notas)}</p>`:""}</div>
-  ${prog&&!tot?`<div class="callout info">Parche programado. Al terminar, un tuno registra el conteo del dinero con «Editar».</div>`:
-  `<div class="block"><h4>Conteo del dinero</h4><div class="tbl-wrap"><table class="money-tbl"><tbody>${rows}
-    ${+p.otro?`<tr><td>Otros / ajuste</td><td></td><td class="num">${clp(p.otro)}</td></tr>`:""}
-    <tr class="sub"><td>Total recaudado</td><td></td><td class="num">${clp(tot)}</td></tr>
-    ${g?`<tr><td>Gastos${p.gastosDetalle?" ("+esc(p.gastosDetalle)+")":""}</td><td></td><td class="num neg">− ${clp(g)}</td></tr>`:""}
-    <tr class="total"><td>Neto</td><td></td><td class="num">${clp(neto)}</td></tr>
-    ${n?`<tr><td>Por asistente (${n})</td><td></td><td class="num">${clp(neto/n)}</td></tr>`:""}</tbody></table></div></div>`}
-  ${repBlock("parche",p)}
-  ${asistentesBlock(p,"parche")}
-  ${isTuno()?`<div class="btn-row"><button class="btn" data-edit-parche="${esc(p.id)}">${prog?"Editar / registrar conteo":"Editar"}</button><button class="btn danger" data-del-parche="${esc(p.id)}">Eliminar</button></div>`:""}`}
-function contratoDetail(c){const cost=costosTotal(c),u=contratoUtil(c),n=att(c),m=+c.monto||0;
-  return `<h2>${esc(c.cliente||"Contrato")}</h2>
-  <div class="block"><dl class="kv"><dt>Tipo</dt><dd>${esc(c.tipo||"Otro")}</dd><dt>Estado</dt><dd><span class="pill ce-${esc(c.estado)}">${ESTADOS_CONTRATO[c.estado]||""}</span></dd>
-    <dt>Fecha</dt><dd>${fmtDateDia(c.fecha)}${c.hora?", "+esc(c.hora):""}</dd>${c.lugar?`<dt>Lugar</dt><dd>${esc(c.lugar)}</dd>`:""}${c.contacto?`<dt>Contacto</dt><dd>${esc(c.contacto)}</dd>`:""}
-    <dt>Registrado por</dt><dd>${esc(nameOf(c.creadoPor))}</dd></dl>${c.notas?`<p class="desc" style="margin-top:10px">${esc(c.notas)}</p>`:""}</div>
-  <div class="block"><h4>Costeo</h4><div class="tbl-wrap"><table class="money-tbl"><tbody>
-    <tr class="sub"><td>Monto cobrado</td><td class="num">${clp(m)}</td></tr>
-    ${(c.costos||[]).map(x=>`<tr><td>${esc(x.concepto||"Costo")}</td><td class="num neg">− ${clp(x.monto)}</td></tr>`).join("")}
-    <tr class="sub"><td>Total costos</td><td class="num">${clp(cost)}</td></tr>
-    <tr class="total"><td>Utilidad</td><td class="num ${u<0?"neg":""}">${clp(u)}</td></tr>
-    ${m?`<tr><td>Margen</td><td class="num">${Math.round(u/m*100)}%</td></tr>`:""}
-    ${n?`<tr><td>Por integrante (${n})</td><td class="num">${clp(u/n)}</td></tr>`:""}</tbody></table></div></div>
-  ${repBlock("contrato",c)}
-  ${asistentesBlock(c,"contrato")}
-  ${isTuno()?`<div class="btn-row"><button class="btn" data-edit-contrato="${esc(c.id)}">Editar</button><button class="btn danger" data-del-contrato="${esc(c.id)}">Eliminar</button></div>`:""}`}
+function parcheDetail(p){return eventoDetail("parche",p)}
+function contratoDetail(c){return eventoDetail("contrato",c)}
 
 function membersChecks(sel,label){const ids=Object.keys(S.members).sort((a,b)=>nameOf(a).localeCompare(nameOf(b)));
   return `<div class="field"><label>${label}</label><div class="checks">${ids.map(id=>`<label><input type="checkbox" name="asis" value="${esc(id)}" ${(sel||[]).includes(id)?"checked":""}> ${esc(nameOf(id))}${id===S.myId?" (tú)":""} <span class="grado g-${grado(id)}" style="margin-left:auto">${GRADOS[grado(id)]}</span></label>`).join("")}</div></div>`}
 function parcheForm(o){const p=o.id?S.parches.find(x=>x.id===o.id):null;
   const v=p||{fecha:todayStr(),hora:"",lugar:"",conteo:{},otro:"",gastos:"",gastosDetalle:"",asistentes:[],notas:""};const ct=v.conteo||{};
   return `<h2>${p?"Editar parche":"Nuevo parche"}</h2><form class="f" id="parcheForm">
-  <div class="field"><label for="pLugar">Lugar</label><input type="text" id="pLugar" required maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Plaza de Armas de Talca"></div>
+  <div class="field"><label for="pLugar">Zona o punto de encuentro</label><input type="text" id="pLugar" required maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Plaza de Armas de Talca"></div>
   <div class="two"><div class="field"><label for="pFechaP">Fecha</label><input type="date" id="pFechaP" required value="${esc(v.fecha)}"></div><div class="field"><label for="pHora">Hora</label><input type="time" id="pHora" value="${esc(v.hora)}"></div></div>
-  <div class="field"><label>Conteo del dinero (cantidad de cada uno)</label><span class="hint">Déjalo en blanco si el parche aún no se hace.</span>
+  <div class="field"><label>Conteo del dinero (cantidad de cada uno)</label><span class="hint">Déjalo en blanco al convocar; se completa después del parche.</span>
     <div class="conteo">${DENOMS.map(d=>`<label class="den" for="den${d}"><span>${clp(d)}</span><input type="number" inputmode="numeric" min="0" step="1" data-den="${d}" id="den${d}" value="${+ct["d"+d]||""}" placeholder="0"></label>`).join("")}</div></div>
   <div class="two"><div class="field"><label for="pOtro">Otros / ajuste ($)</label><input type="number" inputmode="numeric" id="pOtro" value="${+v.otro||""}" placeholder="0"></div>
     <div class="field"><label for="pGastos">Gastos ($)</label><input type="number" inputmode="numeric" min="0" id="pGastos" value="${+v.gastos||""}" placeholder="0"></div></div>
   <div class="field"><label for="pGastosDet">Detalle de gastos</label><input type="text" id="pGastosDet" maxlength="80" value="${esc(v.gastosDetalle)}" placeholder="Ej: bebidas, estacionamiento"></div>
   <div class="live-total" id="pLive"></div>
-  ${membersChecks(v.asistentes,"Integrantes que van o fueron")}
   <div class="field"><label for="pNotas">Notas</label><textarea id="pNotas" maxlength="500">${esc(v.notas)}</textarea></div>
   <button class="btn primary" type="submit">${p?"Guardar cambios":"Registrar parche"}</button></form>`}
 const costoRow=c=>`<div class="costo-row"><input type="text" data-costo-concepto list="conceptos" maxlength="40" value="${esc((c||{}).concepto||"")}" placeholder="Concepto" aria-label="Concepto del costo"><input type="number" inputmode="numeric" min="0" data-costo-monto value="${(c||{}).monto||""}" placeholder="$" aria-label="Monto del costo"><button type="button" class="btn small" data-costo-del aria-label="Quitar costo">✕</button></div>`;
@@ -609,25 +612,237 @@ function contratoForm(o){const c=o.id?S.contratos.find(x=>x.id===o.id):null;
   return `<h2>${c?"Editar contrato":"Nuevo contrato"}</h2><form class="f" id="contratoForm">
   <div class="field"><label for="cCliente">Cliente</label><input type="text" id="cCliente" required maxlength="80" value="${esc(v.cliente)}" placeholder="Ej: Matrimonio González-Muñoz"></div>
   <div class="two"><div class="field"><label for="cTipo">Tipo</label><select class="input" id="cTipo">${TIPOS_CONTRATO.map(t=>`<option ${v.tipo===t?"selected":""}>${t}</option>`).join("")}</select></div>
-    <div class="field"><label for="cEstado">Estado</label><select class="input" id="cEstado">${Object.entries(ESTADOS_CONTRATO).map(([k,l])=>`<option value="${k}" ${v.estado===k?"selected":""}>${l}</option>`).join("")}</select></div></div>
+    <div class="field"><label for="cEstado">Estado del pago</label><select class="input" id="cEstado">${Object.entries(ESTADOS_CONTRATO).map(([k,l])=>`<option value="${k}" ${v.estado===k?"selected":""}>${l}</option>`).join("")}</select></div></div>
   <div class="two"><div class="field"><label for="cFecha">Fecha</label><input type="date" id="cFecha" required value="${esc(v.fecha)}"></div><div class="field"><label for="cHora">Hora</label><input type="time" id="cHora" value="${esc(v.hora)}"></div></div>
   <div class="field"><label for="cLugar">Lugar</label><input type="text" id="cLugar" maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Centro de eventos, Talca"></div>
   <div class="field"><label for="cContacto">Contacto del cliente</label><input type="text" id="cContacto" maxlength="80" value="${esc(v.contacto)}" placeholder="Nombre y teléfono"></div>
+  <div class="field"><label for="cMin">Mínimo de integrantes para el contrato</label><input type="number" id="cMin" inputmode="numeric" min="1" max="60" value="${+v.minIntegrantes||6}"></div>
   <div class="field"><label for="cMonto">Monto cobrado ($)</label><input type="number" inputmode="numeric" min="0" id="cMonto" required value="${esc(v.monto)}" placeholder="Ej: 250000"></div>
   <div class="field"><label>Costos</label><div class="costos" id="costos">${(v.costos&&v.costos.length?v.costos:[{}]).map(costoRow).join("")}</div>
     <button type="button" class="btn small" data-costo-add style="align-self:flex-start">+ Agregar costo</button></div>
   <datalist id="conceptos">${CONCEPTOS.map(x=>`<option value="${x}"></option>`).join("")}</datalist>
   <div class="live-total" id="cLive"></div>
-  ${membersChecks(v.asistentes,"Integrantes que van")}
   <div class="field"><label for="cNotas">Notas</label><textarea id="cNotas" maxlength="600">${esc(v.notas)}</textarea></div>
   <button class="btn primary" type="submit">${c?"Guardar cambios":"Registrar contrato"}</button></form>`}
 function updateLive(){
+  const cl=$("#cierreLive");if(cl){const neto=+cl.dataset.neto||0;let r=0;document.querySelectorAll("[data-reparto]").forEach(i=>r+=+i.value||0);const f=neto-r;
+    cl.innerHTML=`<span>Repartido <b>${clp(r)}</b></span><span>Fondo para la Tuna <b class="${f<0?"neg":""}">${clp(f)}</b></span>${f<0?'<span class="neg">El reparto supera el neto</span>':""}`}
   const pf=$("#parcheForm");if(pf&&$("#pLive")){let t=0;pf.querySelectorAll("[data-den]").forEach(i=>t+=(+i.value||0)*+i.dataset.den);t+=+$("#pOtro").value||0;
-    const g=+$("#pGastos").value||0,n=pf.querySelectorAll("input[name=asis]:checked").length;
+    const g=+$("#pGastos").value||0,e0=S.sheet&&S.sheet.id&&S.parches.find(x=>x.id===S.sheet.id),n=e0?att(e0):0;
     $("#pLive").innerHTML=`<span>Total <b>${clp(t)}</b></span><span>Neto <b>${clp(t-g)}</b></span><span>Por asistente <b>${n?clp((t-g)/n):"—"}</b></span>`}
   const cf=$("#contratoForm");if(cf&&$("#cLive")){const m=+$("#cMonto").value||0;let c=0;cf.querySelectorAll("[data-costo-monto]").forEach(i=>c+=+i.value||0);
-    const n=cf.querySelectorAll("input[name=asis]:checked").length;
+    const e1=S.sheet&&S.sheet.id&&S.contratos.find(x=>x.id===S.sheet.id),n=e1?att(e1):0;
     $("#cLive").innerHTML=`<span>Costos <b>${clp(c)}</b></span><span>Utilidad <b>${clp(m-c)}</b></span><span>Por integrante <b>${n?clp((m-c)/n):"—"}</b></span>`}}
+
+// ---------- flujo de eventos: convocatoria → confirmado → realizado → cerrado ----------
+const INSTR={guitarra:["Guitarra","guitarra"],laud:["Laúd","trino"],bandurria:["Bandurria","trino"],mandolina:["Mandolina","trino"],traversa:["Traversa","trino"],
+  pandereta:["Pandereta","percusion"],pandero:["Pandero","percusion"],percusion:["Otra percusión","percusion"],contrabajo:["Contrabajo","otro"],acordeon:["Acordeón","otro"],voz:["Voz / solista","otro"]};
+const instName=k=>(INSTR[k]||[k||"Sin instrumento"])[0];
+const misInstr=id=>((S.members[id]||{}).instrumentos)||[];
+const ETAPAS=[["convocatoria","Convocatoria"],["confirmado","Confirmado"],["realizado","Realizado"],["cerrado","Cerrado"]];
+const KIND={
+  parche:{col:"parches",arr:()=>S.parches,nombre:"Parche",title:e=>e.lugar||"Parche"},
+  contrato:{col:"contratos",arr:()=>S.contratos,nombre:"Contrato",title:e=>e.cliente||"Contrato"},
+  presentacion:{col:"presentaciones",arr:()=>S.presentaciones,nombre:"Presentación",title:e=>e.titulo||"Presentación"}};
+function etapaDe(kind,e){if(e.etapa)return e.etapa;
+  if(kind==="contrato")return {cancelado:"cancelado",pagado:"cerrado",realizado:"realizado",confirmado:"confirmado"}[e.estado]||"convocatoria";
+  if(kind==="parche")return (e.fecha>todayStr()||(e.fecha===todayStr()&&!parcheTotal(e)))?"confirmado":"cerrado";
+  return "convocatoria"}
+const isOrg=()=>["tuno","pardillo"].includes(me()?.grado);
+const vanIds=e=>e.convocados?Object.entries(e.convocados).filter(([,v])=>v&&v.r==="voy").map(([k])=>k):[...new Set(e.asistentes||[])];
+const noIds=e=>Object.entries(e.convocados||{}).filter(([,v])=>v&&v.r==="no").map(([k])=>k);
+const instDe=(e,id)=>((e.convocados||{})[id]||{}).inst||misInstr(id)[0]||"";
+const MIN_DEF={parche:3,contrato:6,presentacion:6};
+function quorum(kind,e){const ids=vanIds(e),g={guitarra:0,trino:0,percusion:0};
+  ids.forEach(id=>{const k=(INSTR[instDe(e,id)]||[])[1];if(k in g)g[k]++});
+  const min=kind==="parche"?3:(+e.minIntegrantes||MIN_DEF[kind]);
+  const items=[["Integrantes",ids.length,min],["Guitarra",g.guitarra,1],["Trino",g.trino,1],["Percusión",g.percusion,1]];
+  return {ok:items.every(([,v,m])=>v>=m),items}}
+const ETAPA_PILL={convocatoria:'<span class="pill pl-pend">Convocatoria</span>',confirmado:'<span class="pill st-en_curso">Confirmado</span>',
+  realizado:'<span class="pill ce-realizado">Por cerrar</span>',cerrado:'<span class="pill st-realizada">Cerrado</span>',cancelado:'<span class="pill ce-cancelado">Cancelado</span>'};
+function miPill(kind,e){const m=(e.convocados||{})[S.myId],et=etapaDe(kind,e);
+  if(m&&m.r==="voy")return '<span class="pill me-pill">Vas</span>';if(m&&m.r==="no")return "";
+  if(!e.convocados&&(e.asistentes||[]).includes(S.myId))return '<span class="pill me-pill">Vas</span>';
+  return et==="convocatoria"?'<span class="pill pl-pend">Responder</span>':""}
+function stepper(et){if(et==="cancelado")return `<div class="callout warn">Este evento fue cancelado.</div>`;
+  const i=ETAPAS.findIndex(x=>x[0]===et);
+  return `<ol class="steps">${ETAPAS.map(([k,l],j)=>`<li class="${j<i?"done":j===i?"now":""}"><span>${j<i?"✓":j+1}</span>${l}</li>`).join("")}</ol>`}
+
+// avisos de confirmación ya vistos (por dispositivo)
+function vistos(){try{return JSON.parse(localStorage.getItem("tuna_vistos")||"{}")}catch(e){return {}}}
+function markSeen(e){if(!e.confirmadoEn)return;const v=vistos();if(v[e.id]===e.confirmadoEn)return;v[e.id]=e.confirmadoEn;try{localStorage.setItem("tuna_vistos",JSON.stringify(v))}catch(err){}}
+const todosEventos=()=>[...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e]),...S.presentaciones.map(e=>["presentacion",e])];
+function avisosPendientes(){const v=vistos();
+  const conv=todosEventos().filter(([k,e])=>etapaDe(k,e)==="convocatoria"&&(e.fecha||"")>=todayStr()&&!(e.convocados||{})[S.myId]);
+  const conf=todosEventos().filter(([k,e])=>etapaDe(k,e)==="confirmado"&&e.confirmadoEn&&vanIds(e).includes(S.myId)&&v[e.id]!==e.confirmadoEn);
+  return {conv,conf}}
+
+function evCard(kind,e){
+  if(kind==="parche")return parcheCard(e);if(kind==="contrato")return contratoCard(e);
+  const n=vanIds(e).length;
+  return `<button class="task" data-presentacion="${esc(e.id)}"><span class="stripe" style="background:var(--info)"></span><span class="body">
+    <span class="row"><span class="cat">${fmtDateDia(e.fecha)}${e.hora?" · "+esc(e.hora):""}</span>${ETAPA_PILL[etapaDe(kind,e)]||""}${miPill(kind,e)}</span>
+    <h3>${esc(e.titulo||"Presentación")}</h3>
+    <span class="meta">${e.lugar?`<span>${esc(e.lugar)}</span>`:""}<span>${n} van</span>${(e.repertorio||[]).some(x=>x.id)?`<span>${(e.repertorio||[]).filter(x=>x.id).length} canciones</span>`:""}</span></span></button>`}
+
+function convBlock(kind,e){const et=etapaDe(kind,e),abierto=["convocatoria","confirmado"].includes(et);
+  const van=vanIds(e),no=noIds(e),sin=Object.keys(S.members).filter(id=>!van.includes(id)&&!no.includes(id));
+  const mine=(e.convocados||{})[S.myId],q=quorum(kind,e),org=isOrg()&&et!=="cerrado";
+  const chip=(id,quitar)=>`<span class="att-chip"><span class="dot g-${grado(id)||"x"}"></span>${esc(nameOf(id))}${instDe(e,id)?` <small>· ${esc(instName(instDe(e,id)))}</small>`:""}${quitar&&org?`<button class="chip-x" data-quitar="${kind}:${esc(e.id)}:${esc(id)}" aria-label="Quitar a ${esc(nameOf(id))}">✕</button>`:""}</span>`;
+  let h=`<div class="block"><h4>${et==="convocatoria"?"Convocatoria":"Participantes"} · ${van.length} van</h4>
+  <div class="quorum">${q.items.map(([l,n,m])=>`<span class="${n>=m?"ok":"no"}">${n>=m?"✓":"✗"} ${l} ${n}/${m}</span>`).join("")}</div>
+  <p class="chart-note" style="margin:6px 0 4px">${q.ok?"Hay quórum.":"Aún no hay quórum: faltan los puntos marcados con ✗."}${kind==="parche"?" Un parche necesita al menos 3 integrantes con guitarra, trino y percusión.":""}</p>`;
+  if(abierto){const puede=antiguedadOk(S.myId)||(mine&&mine.r==="voy"),ins=misInstr(S.myId),sel=(mine&&mine.inst)||ins[0]||"",opts=ins.length?ins:Object.keys(INSTR);
+    h+=`<div class="my-rsvp"><label for="rsvpInst" class="rep-l">Tu respuesta · ¿con qué instrumento vas?</label>
+    <div class="rsvp-row"><select class="input" id="rsvpInst">${opts.map(k=>`<option value="${k}" ${k===sel?"selected":""}>${esc(instName(k))}</option>`).join("")}</select>
+    ${puede?`<button class="btn small ${mine&&mine.r==="voy"?"primary":"gold"}" data-rsvp="${kind}:${esc(e.id)}:voy">${mine&&mine.r==="voy"?"Voy ✓":"Voy"}</button>`:""}
+    <button class="btn small ${mine&&mine.r==="no"?"primary":""}" data-rsvp="${kind}:${esc(e.id)}:no">No puedo</button></div>
+    ${ins.length?"":`<p class="chart-note">Guarda tus instrumentos en tu perfil (ícono de personas, arriba) para no elegirlos cada vez.</p>`}
+    ${puede?"":`<p class="muted-p" style="margin-top:6px">Llevas menos de 2 meses como aspirante: un tuno o pardillo debe sumarte.</p>`}</div>`}
+  h+=`<p class="rep-g">Van</p>${van.length?`<div class="att">${van.map(id=>chip(id,true)).join("")}</div>`:`<p class="muted-p">Nadie todavía.</p>`}`;
+  if(no.length)h+=`<p class="rep-g">No pueden</p><div class="att">${no.map(id=>chip(id,false)).join("")}</div>`;
+  if(isOrg()&&abierto){
+    h+=`<p class="rep-g">Sin responder · ${sin.length}</p>${sin.length?`<div class="att">${sin.map(id=>chip(id,false)).join("")}</div>`:`<p class="muted-p">Todos respondieron.</p>`}`;
+    const cand=sin.concat(no);
+    if(cand.length)h+=`<p class="rep-g">Sumar a alguien</p><div class="add-row"><select class="input" id="addMem" aria-label="Integrante a sumar">${cand.map(id=>`<option value="${esc(id)}">${esc(nameOf(id))}</option>`).join("")}</select>
+      <select class="input" id="addInst" aria-label="Instrumento">${Object.keys(INSTR).map(k=>`<option value="${k}" ${k===(misInstr(cand[0])[0]||"")?"selected":""}>${esc(instName(k))}</option>`).join("")}</select>
+      <button class="btn small" data-sumar="${kind}:${esc(e.id)}">Sumar</button></div>`}
+  return h+`</div>`}
+
+function etapaActions(kind,e){if(!isOrg())return"";const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kind].nombre.toLowerCase();
+  if(et==="convocatoria")return `<div class="block stage"><h4>Siguiente paso: confirmar</h4><p class="muted-p">Revisa el quórum, arma el repertorio y confirma ${kind==="presentacion"?"la presentación":"el "+nom}. Al confirmar se avisa a los participantes.</p>
+    <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:confirmado">Confirmar ${nom}</button><button class="btn small danger" data-etapa="${kind}:${id}:cancelado">Cancelar</button></div></div>`;
+  if(et==="confirmado")return `<div class="block stage"><h4>Siguiente paso: realizarlo</h4><p class="muted-p">${kind==="parche"?"Durante el parche, registra cada local donde tocaron. ":kind==="presentacion"?"Define canciones y representantes para los concursos. ":""}Al terminar, márcalo como realizado.</p>
+    <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:realizado">Marcar como realizado</button><button class="btn" data-wsp="${kind}:${id}">Avisar por WhatsApp</button><button class="btn small" data-etapa="${kind}:${id}:convocatoria">Volver a convocatoria</button></div></div>`;
+  if(et==="realizado")return `<div class="block stage"><h4>Siguiente paso: cierre</h4><p class="muted-p">${kind==="parche"?"Registra el conteo del dinero y luego la bitácora y el reparto.":kind==="contrato"?"Registra el pago y los costos, y luego la bitácora y el reparto.":"Registra la bitácora y los resultados."}</p>
+    <div class="btn-row" style="margin-top:10px">${kind==="parche"?`<button class="btn" data-edit-parche="${id}">Registrar conteo</button>`:kind==="contrato"?`<button class="btn" data-edit-contrato="${id}">Pago y costos</button>`:""}<button class="btn gold" data-cierre="${kind}:${id}">${kind==="presentacion"?"Bitácora y cierre":"Bitácora y reparto"}</button></div></div>`;
+  if(et==="cerrado")return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small" data-cierre="${kind}:${id}">Editar cierre</button>${kind!=="presentacion"&&isTuno()&&e.reparto&&!e.repartoAprobado?`<button class="btn small gold" data-aprobar="${kind}:${id}">Aprobar reparto</button>`:""}</div>`;
+  if(et==="cancelado")return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small" data-etapa="${kind}:${id}:convocatoria">Reabrir convocatoria</button></div>`;
+  return ""}
+
+function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")return"";const L=p.paradas||[],tot=sum(L,x=>x.veces||1),ed=isOrg()&&et!=="cerrado";
+  let h=`<div class="block"><h4>Locales · ${L.length} ${L.length===1?"local":"locales"}, ${tot} ${tot===1?"pasada":"pasadas"}</h4>`;
+  h+=L.length?`<div class="rep-view">${L.map((x,i)=>`<div class="rep-item"><span class="rep-n">${i+1}</span><span class="rep-t">${esc(x.local)}${x.nota?`<br><small style="color:var(--muted)">${esc(x.nota)}</small>`:""}</span><span class="rep-r">${x.veces||1} ${(x.veces||1)==1?"vez":"veces"}</span>${ed?`<button class="chip-x" data-quitar-local="${esc(p.id)}:${i}" aria-label="Quitar local">✕</button>`:""}</div>`).join("")}</div>`
+    :`<p class="muted-p">Aún no se registran locales.</p>`;
+  if(ed){const prev=[...new Set(S.parches.flatMap(x=>(x.paradas||[]).map(y=>y.local)))];
+    h+=`<form class="add-local" id="localForm"><input type="text" id="lcNombre" list="localesPrev" required maxlength="60" placeholder="Restaurante o local" aria-label="Local">
+      <input type="number" id="lcVeces" inputmode="numeric" min="1" max="20" value="1" aria-label="Veces que tocaron" title="Veces que tocaron (ambientes)">
+      <button class="btn small gold" type="submit">Agregar</button>
+      <input type="text" id="lcNota" class="full" maxlength="100" placeholder="Nota opcional: ambientes, público, recepción…" aria-label="Nota del local"></form>
+      <datalist id="localesPrev">${prev.map(l=>`<option value="${esc(l)}"></option>`).join("")}</datalist>`}
+  return h+`</div>`}
+
+const CONCURSOS=[["solista","Mejor solista"],["capa","Baile de capa"],["pandero","Baile de pandero"]];
+function concursosBlock(e){const princ=(e.repertorio||[]).filter(s=>s.id&&s.grupo==="Show principal"),van=vanIds(e),c=e.concursos||{},ed=isOrg()&&etapaDe("presentacion",e)!=="cerrado";
+  return `<div class="block"><h4>Concursos y representantes</h4>${CONCURSOS.map(([k,l])=>{const x=c[k]||{};
+    return ed?`<div class="conc-row"><b>${l}</b><div class="two"><select class="input" data-conc="${esc(e.id)}:${k}:cancion" aria-label="Canción para ${l}"><option value="">— Canción del show principal —</option>${princ.map(s=>`<option value="${s.id}" ${x.cancion===s.id?"selected":""}>${esc(s.titulo)}</option>`).join("")}</select>
+      <select class="input" data-conc="${esc(e.id)}:${k}:rep" aria-label="Representante para ${l}"><option value="">— Representante —</option>${van.map(id=>`<option value="${esc(id)}" ${x.rep===id?"selected":""}>${esc(nameOf(id))}</option>`).join("")}</select></div></div>`
+      :`<div class="rep-item"><span class="rep-t"><b>${l}</b></span><span class="rep-r">${x.cancion?esc((CANC[x.cancion]||{}).titulo||""):"—"} · ${x.rep?esc(nameOf(x.rep)):"sin representante"}</span></div>`}).join("")}
+    ${ed&&!princ.length?`<p class="chart-note">Primero arma el repertorio con la estructura de presentación para elegir canciones del show principal.</p>`:""}</div>`}
+
+function cierreBlock(kind,e){const b=e.bitacora,R=e.reparto;if(!b&&!R)return"";
+  let h=`<div class="block"><h4>Cierre y bitácora</h4>`;
+  if(b){if(b.altos)h+=`<p class="rep-g">Puntos altos</p><p class="desc">${esc(b.altos)}</p>`;if(b.mejorar)h+=`<p class="rep-g">A mejorar</p><p class="desc">${esc(b.mejorar)}</p>`;
+    if(b.resultados)h+=`<p class="rep-g">Resultados</p><p class="desc">${esc(b.resultados)}</p>`}
+  if(R&&kind!=="presentacion"){const ent=Object.entries(R).filter(([,v])=>+v>0);
+    h+=`<p class="rep-g">Reparto ${e.repartoAprobado?'<span class="pill st-realizada">Aprobado</span>':'<span class="pill pl-pend">Por aprobar</span>'}</p>
+    <div class="tbl-wrap"><table class="money-tbl"><tbody>${ent.map(([id,v])=>`<tr><td>${esc(nameOf(id))}</td><td class="num">${clp(v)}</td></tr>`).join("")}
+    <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr><tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr></tbody></table></div>`}
+  return h+`</div>`}
+
+function parcheMoney(p){const tot=parcheTotal(p);if(!tot&&!+p.gastos)return"";const g=+p.gastos||0,neto=tot-g,n=att(p),ct=p.conteo||{};
+  const rows=DENOMS.filter(d=>+ct["d"+d]).map(d=>`<tr><td>${d>=1000?"Billetes":"Monedas"} de ${clp(d)}</td><td class="num">× ${ct["d"+d]}</td><td class="num">${clp(d*ct["d"+d])}</td></tr>`).join("");
+  return `<div class="block"><h4>Conteo del dinero</h4><div class="tbl-wrap"><table class="money-tbl"><tbody>${rows}
+    ${+p.otro?`<tr><td>Otros / ajuste</td><td></td><td class="num">${clp(p.otro)}</td></tr>`:""}
+    <tr class="sub"><td>Total recaudado</td><td></td><td class="num">${clp(tot)}</td></tr>
+    ${g?`<tr><td>Gastos${p.gastosDetalle?" ("+esc(p.gastosDetalle)+")":""}</td><td></td><td class="num neg">− ${clp(g)}</td></tr>`:""}
+    <tr class="total"><td>Neto</td><td></td><td class="num">${clp(neto)}</td></tr>
+    ${n?`<tr><td>Promedio por asistente (${n})</td><td></td><td class="num">${clp(neto/n)}</td></tr>`:""}</tbody></table></div></div>`}
+function contratoMoney(c){const cost=costosTotal(c),u=contratoUtil(c),n=att(c),m=+c.monto||0;
+  return `<div class="block"><h4>Costeo</h4><div class="tbl-wrap"><table class="money-tbl"><tbody>
+    <tr class="sub"><td>Monto cobrado</td><td class="num">${clp(m)}</td></tr>
+    ${(c.costos||[]).map(x=>`<tr><td>${esc(x.concepto||"Costo")}</td><td class="num neg">− ${clp(x.monto)}</td></tr>`).join("")}
+    <tr class="sub"><td>Total costos</td><td class="num">${clp(cost)}</td></tr>
+    <tr class="total"><td>Utilidad</td><td class="num ${u<0?"neg":""}">${clp(u)}</td></tr>
+    ${m?`<tr><td>Margen</td><td class="num">${Math.round(u/m*100)}%</td></tr>`:""}
+    ${n?`<tr><td>Promedio por integrante (${n})</td><td class="num">${clp(u/n)}</td></tr>`:""}</tbody></table></div></div>`}
+
+function eventoDetail(kind,e){const et=etapaDe(kind,e);markSeen(e);let info="";
+  if(kind==="parche")info=`<dt>Zona</dt><dd>${esc(e.lugar||"—")}</dd><dt>Fecha</dt><dd>${fmtDateDia(e.fecha)}${e.hora?", "+esc(e.hora):""}</dd>`;
+  else if(kind==="contrato")info=`<dt>Tipo</dt><dd>${esc(e.tipo||"Otro")}</dd><dt>Pago</dt><dd><span class="pill ce-${esc(e.estado)}">${ESTADOS_CONTRATO[e.estado]||""}</span></dd>
+    <dt>Fecha</dt><dd>${fmtDateDia(e.fecha)}${e.hora?", "+esc(e.hora):""}</dd>${e.lugar?`<dt>Lugar</dt><dd>${esc(e.lugar)}</dd>`:""}${e.contacto?`<dt>Contacto</dt><dd>${esc(e.contacto)}</dd>`:""}`;
+  else info=`<dt>Fecha</dt><dd>${fmtDateDia(e.fecha)}${e.hora?", "+esc(e.hora):""}</dd>${e.lugar?`<dt>Lugar</dt><dd>${esc(e.lugar)}</dd>`:""}`;
+  info+=`<dt>Organiza</dt><dd>${esc(nameOf(e.creadoPor))}</dd>${e.confirmadoEn?`<dt>Confirmado</dt><dd>${fmtTs(e.confirmadoEn)}${e.confirmadoPor?" por "+esc(nameOf(e.confirmadoPor)):""}</dd>`:""}`;
+  const ek=kind==="presentacion"?"pres":kind;
+  return `<h2>${esc(KIND[kind].title(e))}</h2>${stepper(et)}
+  <div class="block"><dl class="kv">${info}</dl>${e.notas?`<p class="desc" style="margin-top:10px">${esc(e.notas)}</p>`:""}</div>
+  ${etapaActions(kind,e)}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+parcheMoney(e):""}${kind==="contrato"?contratoMoney(e):""}${cierreBlock(kind,e)}
+  ${isOrg()?`<div class="btn-row"><button class="btn" data-edit-${ek}="${esc(e.id)}">Editar datos</button>${isTuno()?`<button class="btn danger" data-del-${ek}="${esc(e.id)}">Eliminar</button>`:""}</div>`:""}`}
+
+function viewPresentaciones(){
+  if(!S.ready.pr)return loadingHtml;const A=S.presentaciones;
+  const prox=A.filter(e=>["convocatoria","confirmado"].includes(etapaDe("presentacion",e))).sort(byFecha);
+  const porCerrar=A.filter(e=>etapaDe("presentacion",e)==="realizado").sort((a,b)=>byFecha(b,a));
+  const resto=A.filter(e=>["cerrado","cancelado"].includes(etapaDe("presentacion",e))).sort((a,b)=>byFecha(b,a));
+  let h=`<div class="section-head"><h2>Presentaciones</h2><span>encuentros y certámenes</span></div>`;
+  if(!A.length)return h+`<div class="empty"><strong>Aún no hay presentaciones</strong>${isOrg()?"Toca el botón dorado + para convocar a una presentación o encuentro.":"Cuando se convoque una presentación, aparecerá aquí."}</div>`;
+  if(prox.length)h+=`<p class="group-label">Convocatorias y próximas</p><div class="list">${prox.map(e=>evCard("presentacion",e)).join("")}</div>`;
+  if(porCerrar.length)h+=`<p class="group-label">Por cerrar</p><div class="list">${porCerrar.map(e=>evCard("presentacion",e)).join("")}</div>`;
+  if(resto.length)h+=`<p class="group-label">Historial</p><div class="list">${resto.map(e=>evCard("presentacion",e)).join("")}</div>`;
+  return h}
+function viewEventos(){
+  const tabs=[["parches","Parches"],["contratos","Contratos"],["presentaciones","Presentaciones"]];
+  return `<div class="subtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-evtab="${k}" aria-selected="${S.evTab===k}">${l}</button>`).join("")}</div>`+
+    (S.evTab==="contratos"?viewContratos():S.evTab==="presentaciones"?viewPresentaciones():viewParches())}
+
+function presForm(o){const e=o.id?S.presentaciones.find(x=>x.id===o.id):null;const v=e||{titulo:"",lugar:"",fecha:"",hora:"",minIntegrantes:6,notas:""};
+  return `<h2>${e?"Editar presentación":"Nueva presentación o encuentro"}</h2><form class="f" id="presForm">
+  <div class="field"><label for="prTitulo">Nombre</label><input type="text" id="prTitulo" required maxlength="90" value="${esc(v.titulo)}" placeholder="Ej: Certamen de tunas de Valparaíso"></div>
+  <div class="two"><div class="field"><label for="prFecha">Fecha</label><input type="date" id="prFecha" required value="${esc(v.fecha)}"></div><div class="field"><label for="prHora">Hora</label><input type="time" id="prHora" value="${esc(v.hora)}"></div></div>
+  <div class="field"><label for="prLugar">Lugar</label><input type="text" id="prLugar" maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Teatro Municipal de Viña del Mar"></div>
+  <div class="field"><label for="prMin">Mínimo de integrantes para ir</label><input type="number" id="prMin" inputmode="numeric" min="1" max="60" value="${+v.minIntegrantes||6}"></div>
+  <div class="field"><label for="prNotas">Notas</label><textarea id="prNotas" maxlength="600" placeholder="Tenida, traslado, horarios de prueba de sonido…">${esc(v.notas)}</textarea></div>
+  <button class="btn primary" type="submit">${e?"Guardar cambios":"Crear y convocar"}</button></form>`}
+
+function cierreForm(o){const k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e)return"";
+  const van=vanIds(e),neto=k==="parche"?parcheNeto(e):k==="contrato"?contratoUtil(e):0,R=e.reparto||{},b=e.bitacora||{};
+  return `<h2>Cierre</h2><p class="chart-note" style="margin:-6px 0 12px">${esc(KIND[k].nombre+" · "+KIND[k].title(e)+" · "+fmtDate(e.fecha))}</p><form class="f" id="cierreForm">
+  <div class="field"><label for="bAltos">Puntos altos, para mantener</label><textarea id="bAltos" maxlength="800" placeholder="Ej: el pasodoble de entrada funcionó muy bien en el segundo local">${esc(b.altos||"")}</textarea></div>
+  <div class="field"><label for="bMejorar">Errores o puntos a mejorar</label><textarea id="bMejorar" maxlength="800" placeholder="Ej: faltó afinar antes de entrar; demoramos entre locales">${esc(b.mejorar||"")}</textarea></div>
+  ${k==="presentacion"?`<div class="field"><label for="bResult">Resultados o premios</label><textarea id="bResult" maxlength="400" placeholder="Ej: 2.º lugar mejor pandereta">${esc(b.resultados||"")}</textarea></div>`:
+  `<div class="field"><label>Reparto: monto para cada integrante</label><span class="hint">Neto a repartir: <b>${clp(neto)}</b>. Lo que no se reparte queda para la Tuna.</span>
+    <div class="reparto">${van.length?van.map(id=>`<label class="rep-p" for="rp_${esc(id)}"><span>${esc(nameOf(id))}</span><input type="number" inputmode="numeric" min="0" step="100" id="rp_${esc(id)}" data-reparto="${esc(id)}" value="${+R[id]||""}" placeholder="0"></label>`).join(""):`<p class="muted-p">No hay participantes registrados.</p>`}</div></div>
+  ${van.length?`<div class="two"><div class="field"><label for="fondoPct">Dejar para la Tuna (%)</label><input type="number" id="fondoPct" inputmode="numeric" min="0" max="100" value="${e.fondoPct??20}"></div>
+    <div class="field" style="justify-content:flex-end"><button type="button" class="btn small" data-rep-igual="${neto}">Repartir el resto en partes iguales</button></div></div>`:""}
+  <div class="live-total" id="cierreLive" data-neto="${neto}"></div>
+  ${k==="contrato"?`<label class="inline-check"><input type="checkbox" id="pagoOk" ${e.estado==="pagado"?"checked":""}> El cliente ya pagó</label>`:""}
+  ${isTuno()?"":`<p class="chart-note">El reparto quedará «por aprobar» hasta que un tuno lo apruebe.</p>`}`}
+  <button class="btn primary" type="submit">Guardar y cerrar</button></form>`}
+
+function wspText(kind,e){const L=[`*${KIND[kind].nombre} confirmado: ${KIND[kind].title(e)}*`,`📅 ${fmtDateDia(e.fecha)}${e.hora?" · "+e.hora:""}`];
+  if(e.lugar&&kind!=="parche")L.push("📍 "+e.lugar);else if(kind==="parche"&&e.lugar)L.push("📍 Zona: "+e.lugar);
+  const van=vanIds(e);L.push("",`*Van (${van.length}):* `+van.map(id=>nameOf(id)+" ("+instName(instDe(e,id))+")").join(", "));
+  if((e.repertorio||[]).some(x=>x.id)){L.push("","*Repertorio:*");let g=null,n=0;
+    e.repertorio.forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;L.push("_"+g+"_")}n++;L.push(n+". "+s.titulo+" ("+s.ritmo+")")})}
+  L.push("","Detalle en la app: "+location.origin+location.pathname);return L.join("\n")}
+
+async function rsvpWrite(kind,id,who,r,inst){const FV=firebase.firestore.FieldValue,data={r,inst:inst||"",at:new Date().toISOString()};if(who!==S.myId)data.por=S.myId;
+  await S.db.doc(KIND[kind].col+"/"+id).update({["convocados."+who]:data,asistentes:r==="voy"?FV.arrayUnion(who):FV.arrayRemove(who)})}
+async function setEtapa(kind,id,et){const e=KIND[kind].arr().find(x=>x.id===id);if(!e)return;const now=new Date().toISOString(),upd={etapa:et};
+  if(et==="confirmado"){upd.confirmadoEn=now;upd.confirmadoPor=S.myId;upd.asistentes=vanIds(e)}
+  if(et==="realizado")upd.realizadoEn=now;
+  if(kind==="contrato"){const m={convocatoria:"cotizado",confirmado:"confirmado",realizado:"realizado",cancelado:"cancelado"};if(m[et]&&!(et==="realizado"&&e.estado==="pagado"))upd.estado=m[et]}
+  const msg={confirmado:"Confirmado. Ya se puede avisar a los participantes.",realizado:"Marcado como realizado. Falta el cierre.",convocatoria:"Volvió a convocatoria.",cancelado:"Evento cancelado."}[et];
+  await safe(()=>S.db.doc(KIND[kind].col+"/"+id).update(upd),msg)}
+
+function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.cliente!==undefined?"contrato":"parche",e)==="cerrado");
+  const fondo=sum(ev,e=>e.fondoTuna),rep=sum(ev,e=>sum(Object.values(e.reparto||{}),v=>v));
+  const loc={};P.forEach(p=>(p.paradas||[]).forEach(x=>{const k=(x.local||"").trim();if(!k)return;const o=loc[k.toLowerCase()]=loc[k.toLowerCase()]||{n:k,v:0,p:new Set()};o.v+=+x.veces||1;o.p.add(p.id)}));
+  let h=`<div class="kpis"><div class="kpi hero"><span>Fondo para la Tuna en el período</span><b>${clp(fondo)}</b><small>${clp(rep)} repartido entre integrantes · ${ev.length} ${ev.length===1?"evento cerrado":"eventos cerrados"} con reparto</small></div></div>`;
+  const Lc=Object.values(loc).sort((a,b)=>b.v-a.v).slice(0,8);
+  if(Lc.length)h+=`<div class="block"><h4>Locales donde más se toca</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Local</th><th class="num">Parches</th><th class="num">Pasadas</th></tr></thead><tbody>${
+    Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
+  return h}
 
 // ---------- indicadores ----------
 const pad2=n=>String(n).padStart(2,"0");
@@ -670,7 +885,7 @@ function viewKpi(){
   const per=[["3m","3 meses"],["6m","6 meses"],["anio","Este año"],["todo","Todo"]],ini=periodStart(),hoy=todayStr();
   let h=`<div class="section-head"><h2>Indicadores</h2><span>desde ${fmtDate(ini)}</span></div>
   <div class="filters">${per.map(([k,l])=>`<button class="chip" data-kper="${k}" aria-pressed="${S.kpiPeriodo===k}">${l}</button>`).join("")}</div>`;
-  const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&!esProgramado(p));
+  const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
   const tk=tareasKpi(ini,hoy),ck=cancionesKpi(P,C,ini,hoy);
   if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+tk+exportBlock();
@@ -697,7 +912,7 @@ function viewKpi(){
   if(P.length){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
     h+=chartBlock("Recaudación por parche"+(P.length>12?" · últimos 12":""),null,barsChart(lp.map(p=>+p.fecha.slice(8)+"/"+(+p.fecha.slice(5,7))),[s],fmtMoneyShort,
       i=>{const p=lp[i],n=att(p);return `${p.lugar||"Parche"} · ${fmtDate(p.fecha)}\nNeto: ${clp(parcheNeto(p))}\n${n} asistente${n===1?"":"s"}${n?" · "+clp(parcheNeto(p)/n)+" c/u":""}`}),"Monto neto de cada parche, en orden de fecha.")}
-  h+=ck;
+  h+=ck+fondoKpi(P,C);
   const rows=mids.map(id=>({id,p:P.filter(e=>(e.asistentes||[]).includes(id)).length,c:C.filter(e=>(e.asistentes||[]).includes(id)).length}))
     .sort((a,b)=>(b.p+b.c)-(a.p+a.c)||nameOf(a.id).localeCompare(nameOf(b.id)));
   const act=rows.filter(r=>r.p+r.c),zero=rows.filter(r=>!(r.p+r.c)),mxr=Math.max(1,...act.map(r=>r.p+r.c));
@@ -749,8 +964,12 @@ function viewLlamados(){
   const prox=S.llamados.filter(llamadoAbierto).sort(byFecha),pas=S.llamados.filter(l=>!llamadoAbierto(l)).sort((a,b)=>byFecha(b,a)).slice(0,15);
   const sr=prox.filter(l=>!miResp(l.id)).length;
   let h=`<div class="section-head"><h2>Llamados</h2><span>${sr?sr+" por responder":"al día"}</span></div>`;
-  if(!S.llamados.length)return h+`<div class="empty"><strong>No hay llamados</strong>${isTuno()?"Toca el botón dorado + para convocar a una reunión, ensayo, parche, contrato o evento.":"Cuando un tuno haga un llamado, aparecerá aquí para que confirmes si vas."}</div>`;
-  if(prox.length)h+=`<p class="group-label">Próximos</p><div class="list">${prox.map(llamadoCard).join("")}</div>`;
+  const av=avisosPendientes();
+  if(av.conf.length)h+=`<p class="group-label">Confirmados para ti · revisa el detalle</p><div class="list">${av.conf.map(([k,e])=>evCard(k,e)).join("")}</div>`;
+  const convAll=todosEventos().filter(([k,e])=>etapaDe(k,e)==="convocatoria"&&(e.fecha||"")>=todayStr()).sort((a,b)=>byFecha(a[1],b[1]));
+  if(convAll.length)h+=`<p class="group-label">Convocatorias abiertas: parches, contratos y presentaciones</p><div class="list">${convAll.map(([k,e])=>evCard(k,e)).join("")}</div>`;
+  if(!S.llamados.length)return h+(av.conf.length||convAll.length?"":`<div class="empty"><strong>No hay llamados</strong>${isTuno()?"Toca el botón dorado + para convocar a una reunión o ensayo. Los parches, contratos y presentaciones se convocan desde Eventos.":"Cuando haya una convocatoria, aparecerá aquí para que respondas si vas."}</div>`);
+  if(prox.length)h+=`<p class="group-label">Reuniones, ensayos y otros llamados</p><div class="list">${prox.map(llamadoCard).join("")}</div>`;
   if(pas.length)h+=`<p class="group-label">Anteriores</p><div class="list">${pas.map(llamadoCard).join("")}</div>`;
   return h}
 function llamadoDetail(l){const rs=respDe(l.id),voy=rs.filter(r=>r.r==="voy").map(r=>r.uid),no=rs.filter(r=>r.r==="no").map(r=>r.uid),ab=llamadoAbierto(l),mr=miResp(l.id);
@@ -777,7 +996,7 @@ function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
     ...S.contratos.filter(contratoAbierto).map(c=>["contratos:"+c.id,"Contrato · "+(c.cliente||"")+" · "+fmtDate(c.fecha)])];
   const cur=v.vinculo?v.vinculo.col+":"+v.vinculo.id:"";
   return `<h2>${l?"Editar llamado":"Nuevo llamado"}</h2><form class="f" id="llamadoForm">
-  <div class="two"><div class="field"><label for="lTipo">Tipo</label><select class="input" id="lTipo">${Object.entries(TIPOS_LLAMADO).map(([k,t])=>`<option value="${k}" ${v.tipo===k?"selected":""}>${t}</option>`).join("")}</select></div>
+  <div class="two"><div class="field"><label for="lTipo">Tipo</label><select class="input" id="lTipo">${Object.entries(TIPOS_LLAMADO).filter(([k])=>!["parche","contrato","presentacion"].includes(k)||v.tipo===k).map(([k,t])=>`<option value="${k}" ${v.tipo===k?"selected":""}>${t}</option>`).join("")}</select></div>
     <div class="field"><label for="lFecha">Fecha</label><input type="date" id="lFecha" required value="${esc(v.fecha)}"></div></div>
   <div class="field"><label for="lTitulo">Título</label><input type="text" id="lTitulo" required maxlength="90" value="${esc(v.titulo)}" placeholder="Ej: Reunión de planificación del certamen"></div>
   <div class="two"><div class="field"><label for="lHora">Hora</label><input type="time" id="lHora" value="${esc(v.hora)}"></div>
@@ -789,9 +1008,9 @@ function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
   <button class="btn primary" type="submit">${l?"Guardar cambios":"Publicar llamado"}</button></form>`}
 
 // ---------- repertorio ----------
-const evFor=(k,id)=>k==="parche"?S.parches.find(x=>x.id===id):k==="contrato"?S.contratos.find(x=>x.id===id):(S.llamados.find(x=>x.id===id)||S.presAll.find(x=>x.id===id));
-const evTitle=(k,e)=>k==="parche"?"Parche · "+(e.lugar||"")+" · "+fmtDate(e.fecha):k==="contrato"?"Contrato · "+(e.cliente||"")+" · "+fmtDate(e.fecha):(TIPOS_LLAMADO[e.tipo]||"Llamado")+" · "+(e.titulo||"")+" · "+fmtDate(e.fecha);
-function playCounts(){const c={};[...S.parches,...S.contratos,...S.presAll].forEach(e=>(e.repertorio||[]).forEach(s=>{if(s.id)c[s.id]=(c[s.id]||0)+1}));return c}
+const evFor=(k,id)=>k==="parche"?S.parches.find(x=>x.id===id):k==="contrato"?S.contratos.find(x=>x.id===id):k==="presentacion"?S.presentaciones.find(x=>x.id===id):(S.llamados.find(x=>x.id===id)||S.presAll.find(x=>x.id===id));
+const evTitle=(k,e)=>k==="presentacion"?"Presentación · "+(e.titulo||"")+" · "+fmtDate(e.fecha):k==="parche"?"Parche · "+(e.lugar||"")+" · "+fmtDate(e.fecha):k==="contrato"?"Contrato · "+(e.cliente||"")+" · "+fmtDate(e.fecha):(TIPOS_LLAMADO[e.tipo]||"Llamado")+" · "+(e.titulo||"")+" · "+fmtDate(e.fecha);
+function playCounts(){const c={};[...S.parches,...S.contratos,...S.presAll,...S.presentaciones].forEach(e=>(e.repertorio||[]).forEach(s=>{if(s.id)c[s.id]=(c[s.id]||0)+1}));return c}
 const repCountTxt=()=>S.repDraft.filter(s=>s.id).length+" de "+S.repDraft.length+" canciones elegidas";
 function repSlotsHtml(){let g=null,h="";
   S.repDraft.forEach((sl,i)=>{if(sl.grupo!==g){g=sl.grupo;h+=`<p class="group-label">${esc(g)}</p>`}
@@ -800,13 +1019,13 @@ function repSlotsHtml(){let g=null,h="";
       <select class="input" id="rs${i}" data-rep-slot="${i}"><option value="">— Elegir canción —</option>${opts.map(([id,t,r])=>`<option value="${id}" ${sl.id===id?"selected":""}>${esc(t)} · ${esc(r||"Sin estilo")}</option>`).join("")}</select></div>
       <span class="rep-mv"><button type="button" class="btn small" data-rep-mv="${i}:-1" aria-label="Subir canción" ${i?"":"disabled"}>↑</button><button type="button" class="btn small" data-rep-mv="${i}:1" aria-label="Bajar canción" ${i<S.repDraft.length-1?"":"disabled"}>↓</button></span></div>`});
   return h+`<p class="chart-note" id="repCount">${repCountTxt()}</p>`}
-function repForm(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=rp.id||DEF_PLANTILLA[o.kind],pr=rp.param||PLANTILLAS[pl].def;
-  if(!S.repDraft)S.repDraft=(ev.repertorio&&ev.repertorio.length)?ev.repertorio.map(x=>({...x})):PLANTILLAS[pl].build(pr);
+function repForm(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=PLANTILLAS[rp.id]?rp.id:DEF_PLANTILLA[o.kind],vals=rp.params||(rp.param!=null?[rp.param]:null);
+  if(!S.repDraft)S.repDraft=(ev.repertorio&&ev.repertorio.length)?ev.repertorio.map(x=>({...x})):PLANTILLAS[pl].build(vals||PLANTILLAS[pl].params.map(p=>p.d));
   return `<h2>Repertorio</h2><p class="chart-note" style="margin:-6px 0 12px">${esc(evTitle(o.kind,ev))}</p>
   <form class="f" id="repForm">
-    <div class="two"><div class="field"><label for="rPl">Estructura</label><select class="input" id="rPl">${Object.entries(PLANTILLAS).map(([k,p])=>`<option value="${k}" ${k===pl?"selected":""}>${p.nombre}</option>`).join("")}</select></div>
-      <div class="field"><label for="rParam" id="rParamL">${PLANTILLAS[pl].param}</label><input type="number" inputmode="numeric" min="1" max="120" id="rParam" value="${pr}"></div></div>
-    <p class="chart-note" style="margin:0">Un show de 45 min son 12 canciones y uno de 20 min son 5. Toca «Aplicar estructura» al cambiar la estructura o la cantidad.</p>
+    <div class="field"><label for="rPl">Estructura</label><select class="input" id="rPl">${Object.entries(PLANTILLAS).map(([k,p])=>`<option value="${k}" ${k===pl?"selected":""}>${p.nombre}</option>`).join("")}</select></div>
+    <div class="params" id="rParams">${paramInputs(pl,vals)}</div>
+    <p class="chart-note" style="margin:0">Parche: rondas de pasodoble, libre y bolero o vals. Contrato: 45 min son 12 canciones y 20 min son 5. Presentación: show principal, bis, show secundario y pasacalles. Toca «Aplicar estructura» después de cambiar algo.</p>
     <div class="btn-row"><button type="button" class="btn small" data-rep-build>Aplicar estructura</button><button type="button" class="btn small gold" data-rep-sugerir>Sugerir canciones</button></div>
     <div id="repSlots">${repSlotsHtml()}</div>
     <button class="btn primary" type="submit">Guardar repertorio</button></form>`}
@@ -814,10 +1033,10 @@ function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<d
   if(!r.length)h+=`<p class="muted-p">${isTuno()?"Aún no se arma el repertorio de este evento.":"El repertorio aún no está definido."}</p>`;
   else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
     h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`}
-  if(isTuno())h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
+  if(kind==="llamado"?isTuno():isOrg()&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
   return h+`</div>`}
 function cancionesKpi(P,C,ini,hoy){
-  const L=S.presAll.filter(l=>l.fecha>=ini&&l.fecha<=hoy),cnt={};
+  const L=[...S.presAll,...S.presentaciones.filter(e=>["realizado","cerrado"].includes(etapaDe("presentacion",e)))].filter(l=>l.fecha>=ini&&l.fecha<=hoy),cnt={};
   const add=(e,src)=>(e.repertorio||[]).forEach(s=>{if(!s.id)return;const c=cnt[s.id]=cnt[s.id]||{id:s.id,titulo:s.titulo,ritmo:s.ritmo||"Sin estilo",p:0,c:0,l:0};c[src]++});
   P.forEach(e=>add(e,"p"));C.forEach(e=>add(e,"c"));L.forEach(e=>add(e,"l"));
   const rows=Object.values(cnt).map(r=>({...r,t:r.p+r.c+r.l})).sort((a,b)=>b.t-a.t||a.titulo.localeCompare(b.titulo));
@@ -858,15 +1077,19 @@ function tareasKpi(ini,hoy){
 function viewPeople(){
   const ids=Object.keys(S.members).sort((a,b)=>{const o={tuno:0,pardillo:1,aspirante:2};return (o[grado(a)]-o[grado(b)])||nameOf(a).localeCompare(nameOf(b))});
   const count=id=>S.tasks.filter(t=>(t.asignados||[]).includes(id)&&t.estado!=="realizada").length;
-  const asis=id=>[...S.parches,...S.contratos].filter(e=>e.estado!=="cancelado"&&(e.asistentes||[]).includes(id)).length;
+  const asis=id=>[...S.parches,...S.contratos,...S.presentaciones].filter(e=>e.estado!=="cancelado"&&e.etapa!=="cancelado"&&(e.asistentes||[]).includes(id)).length;
   let h=`<div class="section-head"><h2>Integrantes</h2><span>${ids.length} en la Tuna</span></div>`;
+  const mis=misInstr(S.myId);
+  h+=`<div class="block"><h4>Mis instrumentos</h4><form id="instForm" class="f"><div class="inst-grid">${Object.keys(INSTR).map(k=>`<label class="inst-op"><input type="checkbox" name="inst" value="${k}" ${mis.includes(k)?"checked":""}> ${esc(instName(k))}</label>`).join("")}</div>
+    <div class="field"><label for="instPrin">Instrumento principal</label><select class="input" id="instPrin">${Object.keys(INSTR).map(k=>`<option value="${k}" ${mis[0]===k?"selected":""}>${esc(instName(k))}</option>`).join("")}</select></div>
+    <button class="btn small primary" type="submit" style="align-self:flex-start">Guardar instrumentos</button></form></div>`;
   if(canManage()){
     h+=`<div class="block"><h4>Solicitudes de ingreso</h4>${S.requests.length?S.requests.map(r=>`<div class="person"><div class="avatar">${esc(initials(r.apodo||"?"))}</div><div class="info"><b>${esc(r.apodo)}</b><span>${esc(r.nombre||"")}${r.correo?" · "+esc(r.correo):""}${r.ingreso?" · en la Tuna desde "+fmtDate(r.ingreso):""}${r.mensaje?" · "+esc(r.mensaje):""}</span></div>
       <select id="rq-${esc(r.id)}" aria-label="Grado para ${esc(r.apodo)}"><option value="aspirante">Aspirante</option><option value="pardillo">Pardillo</option><option value="tuno">Tuno</option></select>
       <button class="btn small gold" data-accept="${esc(r.id)}">Aceptar</button><button class="btn small" data-reject="${esc(r.id)}" aria-label="Rechazar">✕</button></div>`).join("")
       :`<p style="margin:0;color:var(--muted);font-size:14px">No hay solicitudes. Comparte el enlace de la app con los integrantes y pídeles que entren con Google y soliciten ingreso.</p>`}</div>`}
   h+=`<div class="block">${ids.map(id=>`<div class="person"><div class="avatar" style="background:${grado(id)==="tuno"?"var(--gold)":grado(id)==="pardillo"?"var(--wine)":"var(--info)"};color:${grado(id)==="tuno"?"#2b1a00":"#fff"}">${esc(initials(nameOf(id)))}</div>
-    <div class="info"><b>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</b><span>${count(id)} tarea${count(id)===1?"":"s"} activa${count(id)===1?"":"s"} · ${asis(id)} asistencia${asis(id)===1?"":"s"}${grado(id)==="aspirante"?(antiguedadOk(id)?" · más de 2 meses":" · menos de 2 meses"):""}</span></div>
+    <div class="info"><b>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</b><span>${count(id)} tarea${count(id)===1?"":"s"} activa${count(id)===1?"":"s"} · ${asis(id)} asistencia${asis(id)===1?"":"s"}${grado(id)==="aspirante"?(antiguedadOk(id)?" · más de 2 meses":" · menos de 2 meses"):""}${misInstr(id).length?" · "+misInstr(id).map(instName).join(", "):""}</span></div>
     ${canManage()&&id!==S.myId&&!S.members[id].admin?`${grado(id)!=="aspirante"?"":`<input type="date" data-ingreso="${esc(id)}" value="${esc(ingresoDe(id))}" aria-label="Fecha de ingreso de ${esc(nameOf(id))}" title="Fecha de ingreso a la Tuna" style="width:auto;min-height:36px;padding:4px 8px">`}<select data-grado="${esc(id)}" aria-label="Grado de ${esc(nameOf(id))}">${Object.entries(GRADOS).map(([k,l])=>`<option value="${k}" ${grado(id)===k?"selected":""}>${l}</option>`).join("")}</select><button class="btn small" data-remove="${esc(id)}" aria-label="Quitar">✕</button>`:`<span class="grado g-${grado(id)}">${GRADOS[grado(id)]}</span>`}
     <button class="btn small" data-person="${esc(id)}">Tareas</button></div>`).join("")}</div>`+logoutBtn();
   return h}
@@ -887,15 +1110,18 @@ function joinView(){
   <form class="f" id="joinForm"><div class="field"><label for="joinApodo">Tu apodo en la Tuna</label><input type="text" id="joinApodo" required maxlength="40" placeholder="Ej: Guitarrón"></div>
   <div class="field"><label for="joinMsg">Mensaje (opcional)</label><input type="text" id="joinMsg" maxlength="80" placeholder="Ej: bandurria, guitarra"></div>
   <div class="field"><label for="joinIngreso">¿Desde cuándo estás en la Tuna?</label><input type="date" id="joinIngreso" required></div>
+  <div class="field"><label>¿Qué instrumentos tocas?</label><div class="inst-grid">${Object.keys(INSTR).map(k=>`<label class="inst-op"><input type="checkbox" name="jinst" value="${k}"> ${esc(instName(k))}</label>`).join("")}</div></div>
   <button class="btn primary" type="submit">Solicitar ingreso</button></form>${logoutBtn()}</div>`}
 
 // ---------- hojas (detalle / formularios) ----------
 function renderSheet(){
   const L=$("#layer");if(!S.sheet){L.innerHTML="";return}
   // no re-dibujar formularios abiertos mientras se escribe
-  if(!["task","parche","contrato","llamado"].includes(S.sheet.type)&&L.firstChild)return;
+  if(!["task","parche","contrato","presentacion","llamado"].includes(S.sheet.type)&&L.firstChild)return;
   const scroll=L.querySelector(".sheet")?.scrollTop||0;
-  const draft=L.querySelector("#noteText")?.value;
+  // conserva lo que se está escribiendo cuando llegan datos nuevos
+  const keep={};L.querySelectorAll("input[id],textarea[id],select[id]").forEach(x=>{if(x.type!=="checkbox")keep[x.id]=x.value});
+  const focusId=document.activeElement&&L.contains(document.activeElement)?document.activeElement.id:null;
   let inner="";
   if(S.sheet.type==="task"){const t=S.tasks.find(x=>x.id===S.sheet.id);if(!t){S.sheet=null;L.innerHTML="";return}inner=taskDetail(t)}
   else if(S.sheet.type==="form")inner=taskForm(S.sheet);
@@ -906,11 +1132,15 @@ function renderSheet(){
   else if(S.sheet.type==="llamado"){const l=S.llamados.find(x=>x.id===S.sheet.id);if(!l){S.sheet=null;L.innerHTML="";return}inner=llamadoDetail(l)}
   else if(S.sheet.type==="llamadoForm")inner=llamadoForm(S.sheet);
   else if(S.sheet.type==="repForm"){if(!evFor(S.sheet.kind,S.sheet.id)){S.sheet=null;L.innerHTML="";return}inner=repForm(S.sheet)}
+  else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
+  else if(S.sheet.type==="presForm")inner=presForm(S.sheet);
+  else if(S.sheet.type==="cierreForm")inner=cierreForm(S.sheet);
   else if(S.sheet.type==="parcheForm")inner=parcheForm(S.sheet);
   else if(S.sheet.type==="contratoForm")inner=contratoForm(S.sheet);
   L.innerHTML=`<div class="overlay" data-backdrop><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div><button class="close" data-close aria-label="Cerrar">×</button>${inner}</div></div>`;
   const sh=L.querySelector(".sheet");if(sh)sh.scrollTop=scroll;
-  if(draft&&L.querySelector("#noteText"))L.querySelector("#noteText").value=draft;
+  Object.entries(keep).forEach(([id,v])=>{const x=document.getElementById(id);if(x&&L.contains(x)&&x.tagName!=="SELECT"&&v)x.value=v;else if(x&&x.tagName==="SELECT"&&(id==="rsvpInst"||id==="addMem"||id==="addInst"))x.value=v||x.value});
+  if(focusId){const x=document.getElementById(focusId);if(x)try{x.focus({preventScroll:true})}catch(e){}}
 }
 function openSheet(o){S.sheet=o;S.repDraft=null;$("#layer").innerHTML="";renderSheet();updateLive()}
 function closeSheet(){S.sheet=null;S.repDraft=null;$("#layer").innerHTML=""}
@@ -983,7 +1213,7 @@ document.addEventListener("submit",async e=>{
   if(f.id==="ownerForm"){const ap=$("#ownApodo").value.trim();if(!ap)return;
     await safe(()=>S.db.doc("miembros/"+S.myId).set({apodo:ap,grado:"tuno",agrupacion:AGRUPACION,desde:new Date().toISOString(),admin:true}),"Listo, ya eres parte del planificador")}
   if(f.id==="joinForm"){const ap=$("#joinApodo").value.trim();if(!ap)return;
-    await safe(()=>S.db.doc("solicitudes/"+S.myId).set({apodo:ap,mensaje:$("#joinMsg").value.trim(),ingreso:$("#joinIngreso").value||"",nombre:S.authUser.displayName||"",correo:S.authUser.email||"",agrupacion:AGRUPACION,fecha:new Date().toISOString()}),"Solicitud enviada")}
+    await safe(()=>S.db.doc("solicitudes/"+S.myId).set({apodo:ap,mensaje:$("#joinMsg").value.trim(),ingreso:$("#joinIngreso").value||"",instrumentos:[...document.querySelectorAll("input[name=jinst]:checked")].map(i=>i.value),nombre:S.authUser.displayName||"",correo:S.authUser.email||"",agrupacion:AGRUPACION,fecha:new Date().toISOString()}),"Solicitud enviada")}
   if(f.id==="taskForm"){
     const o=S.sheet;const asg=[...f.querySelectorAll('input[name=asg]:checked')].map(i=>i.value);
     const fecha=$("#tFecha").value;const parent=o.padre&&S.tasks.find(x=>x.id===o.padre);
@@ -994,11 +1224,11 @@ document.addEventListener("submit",async e=>{
     else{const id=uid();await safe(()=>tref(id).set({...data,estado:"pendiente",fechaLimiteOriginal:fecha,creadoPor:S.myId,agrupacion:AGRUPACION,padre:o.padre||null,notas:[],solicitudPlazo:null,creado:new Date().toISOString()}),"Tarea creada");
       if(o.padre)openSheet({type:"task",id:o.padre});else closeSheet()}}
   if(f.id==="repForm"){const o=S.sheet,ev=evFor(o.kind,o.id);if(!ev)return;
-    const pl=$("#rPl").value,pr=Math.round(+$("#rParam").value||PLANTILLAS[pl].def);
+    const pl=$("#rPl").value,pr=readParams(pl);
     const repertorio=S.repDraft.map(x=>({tipo:x.tipo,grupo:x.grupo,id:x.id||"",titulo:x.titulo||"",ritmo:x.ritmo||""}));
-    const col=o.kind==="parche"?"parches":o.kind==="contrato"?"contratos":"llamados";
-    await safe(()=>S.db.doc(col+"/"+o.id).update({repertorio,repPlantilla:{id:pl,param:pr}}),"Repertorio guardado");
-    openSheet({type:o.kind==="parche"?"parche":o.kind==="contrato"?"contrato":"llamado",id:o.id});return}
+    const col=o.kind==="llamado"?"llamados":KIND[o.kind].col;
+    await safe(()=>S.db.doc(col+"/"+o.id).update({repertorio,repPlantilla:{id:pl,params:pr}}),"Repertorio guardado");
+    openSheet({type:o.kind,id:o.id});return}
   if(f.id==="llamadoForm"){const o=S.sheet,vin=$("#lVinc").value,now=new Date().toISOString();
     const data={tipo:$("#lTipo").value,titulo:$("#lTitulo").value.trim(),fecha:$("#lFecha").value,hora:$("#lHora").value,lugar:$("#lLugar").value.trim(),mensaje:$("#lMsg").value.trim(),
       vinculo:vin?{col:vin.split(":")[0],id:vin.split(":")[1]}:null};
@@ -1016,18 +1246,38 @@ document.addEventListener("submit",async e=>{
     f.querySelectorAll("[data-den]").forEach(i=>{const n=Math.max(0,Math.floor(+i.value||0));if(n)conteo["d"+i.dataset.den]=n});
     const data={lugar:$("#pLugar").value.trim(),fecha:$("#pFechaP").value,hora:$("#pHora").value,conteo,otro:Math.round(+$("#pOtro").value||0),
       gastos:Math.max(0,Math.round(+$("#pGastos").value||0)),gastosDetalle:$("#pGastosDet").value.trim(),
-      asistentes:[...f.querySelectorAll('input[name=asis]:checked')].map(i=>i.value),notas:$("#pNotas").value.trim()};
+      notas:$("#pNotas").value.trim()};
     data.total=parcheTotal(data);data.neto=data.total-data.gastos;
     if(o.id){await safe(()=>S.db.doc("parches/"+o.id).update({...data,actualizado:new Date().toISOString()}),"Parche guardado");openSheet({type:"parche",id:o.id})}
-    else{const id=uid();await safe(()=>S.db.doc("parches/"+id).set({...data,creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Parche registrado");closeSheet()}}
+    else{const id=uid();await safe(()=>S.db.doc("parches/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Parche convocado");openSheet({type:"parche",id})}}
   if(f.id==="contratoForm"){const o=S.sheet;
     const costos=[...f.querySelectorAll(".costo-row")].map(r=>({concepto:r.querySelector("[data-costo-concepto]").value.trim(),monto:Math.max(0,Math.round(+r.querySelector("[data-costo-monto]").value||0))})).filter(x=>x.concepto||x.monto);
     const data={cliente:$("#cCliente").value.trim(),tipo:$("#cTipo").value,estado:$("#cEstado").value,fecha:$("#cFecha").value,hora:$("#cHora").value,
       lugar:$("#cLugar").value.trim(),contacto:$("#cContacto").value.trim(),monto:Math.max(0,Math.round(+$("#cMonto").value||0)),costos,
-      asistentes:[...f.querySelectorAll('input[name=asis]:checked')].map(i=>i.value),notas:$("#cNotas").value.trim()};
+      minIntegrantes:Math.max(1,Math.round(+$("#cMin").value||6)),notas:$("#cNotas").value.trim()};
     data.costoTotal=costosTotal(data);data.utilidad=data.monto-data.costoTotal;
     if(o.id){await safe(()=>S.db.doc("contratos/"+o.id).update({...data,actualizado:new Date().toISOString()}),"Contrato guardado");openSheet({type:"contrato",id:o.id})}
-    else{const id=uid();await safe(()=>S.db.doc("contratos/"+id).set({...data,creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Contrato registrado");closeSheet()}}
+    else{const id=uid();await safe(()=>S.db.doc("contratos/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Contrato convocado");openSheet({type:"contrato",id})}}
+  if(f.id==="presForm"){const o=S.sheet,now=new Date().toISOString();
+    const data={titulo:$("#prTitulo").value.trim(),fecha:$("#prFecha").value,hora:$("#prHora").value,lugar:$("#prLugar").value.trim(),minIntegrantes:Math.max(1,Math.round(+$("#prMin").value||6)),notas:$("#prNotas").value.trim()};
+    if(o.id){await safe(()=>S.db.doc("presentaciones/"+o.id).update({...data,actualizado:now}),"Presentación guardada");openSheet({type:"presentacion",id:o.id})}
+    else{const id=uid();await safe(()=>S.db.doc("presentaciones/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:now}),"Presentación convocada");openSheet({type:"presentacion",id})}return}
+  if(f.id==="cierreForm"){const o=S.sheet,k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e)return;
+    const upd={bitacora:{altos:$("#bAltos").value.trim(),mejorar:$("#bMejorar").value.trim()},etapa:"cerrado",cerradoEn:new Date().toISOString(),cerradoPor:S.myId};
+    if(k==="presentacion")upd.bitacora.resultados=$("#bResult").value.trim();
+    else{const neto=k==="parche"?parcheNeto(e):contratoUtil(e),R={};document.querySelectorAll("[data-reparto]").forEach(i=>{const v=Math.max(0,Math.round(+i.value||0));if(v)R[i.dataset.reparto]=v});
+      const rep=sum(Object.values(R),v=>v);if(rep>neto){toast("El reparto supera el neto. Revisa los montos.");return}
+      Object.assign(upd,{reparto:R,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
+      if(isTuno())upd.repartoAprobado=true;
+      if(k==="contrato")upd.estado=$("#pagoOk")&&$("#pagoOk").checked?"pagado":"realizado"}
+    await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");openSheet({type:k,id:o.id});return}
+  if(f.id==="localForm"){const pid=S.sheet&&S.sheet.id,nom=$("#lcNombre").value.trim();if(!pid||!nom)return;
+    const x={local:nom,veces:Math.max(1,Math.round(+$("#lcVeces").value||1)),nota:$("#lcNota").value.trim(),at:new Date().toISOString(),por:S.myId};
+    $("#lcNombre").value="";$("#lcNota").value="";$("#lcVeces").value="1";
+    await safe(()=>S.db.doc("parches/"+pid).update({paradas:firebase.firestore.FieldValue.arrayUnion(x)}),"Local agregado");return}
+  if(f.id==="instForm"){const sel=[...f.querySelectorAll("input[name=inst]:checked")].map(i=>i.value),pr=$("#instPrin").value;
+    const list=[pr,...sel.filter(x=>x!==pr)];
+    await safe(()=>S.db.doc("miembros/"+S.myId).update({instrumentos:list}),"Instrumentos guardados");return}
   if(f.id==="noteForm"){const t=S.tasks.find(x=>x.id===S.sheet.id);const txt=$("#noteText").value.trim();if(!t||!txt)return;
     const need=$("#noteNeedsTime")?.checked;
     await safe(()=>tref(t.id).update({notas:[...(t.notas||[]),note(S.myId,txt,need?"requiere_plazo":"nota")]}),need?"Nota agregada. Ya puedes solicitar nueva fecha.":"Nota agregada");
@@ -1056,7 +1306,9 @@ document.addEventListener("change",async e=>{
   if(el.dataset.repSlot!=null&&S.repDraft){const sl=S.repDraft[+el.dataset.repSlot],c=CANC[el.value];
     if(sl){if(c)Object.assign(sl,{id:c.id,titulo:c.titulo,ritmo:c.ritmo});else{delete sl.id;delete sl.titulo;delete sl.ritmo}}
     const nt=$("#repCount");if(nt)nt.textContent=repCountTxt();return}
-  if(el.id==="rPl"){$("#rParamL").textContent=PLANTILLAS[el.value].param;$("#rParam").value=PLANTILLAS[el.value].def;return}
+  if(el.id==="rPl"){$("#rParams").innerHTML=paramInputs(el.value,null);return}
+  if(el.id==="addMem"){const i=misInstr(el.value)[0];if(i&&$("#addInst"))$("#addInst").value=i;return}
+  if(el.dataset.conc){const [id,k,f]=el.dataset.conc.split(":");await safe(()=>S.db.doc("presentaciones/"+id).update({["concursos."+k+"."+f]:el.value}),"Guardado");return}
   if(el.dataset.grado){const id=el.dataset.grado;await safe(()=>S.db.doc("miembros/"+id).update({grado:el.value}),nameOf(id)+" ahora es "+GRADOS[el.value].toLowerCase())}
 });
 
@@ -1070,6 +1322,27 @@ document.addEventListener("click",async e=>{
       else if(e.code!=="auth/popup-closed-by-user"){S.loginError="No se pudo iniciar sesión ("+e.code+").";render()}}return}
   if("logout" in ds){firebase.auth().signOut();return}
   if(ds.nav){S.view=ds.nav;closeSheet();render();window.scrollTo(0,0);return}
+  if(ds.evtab){S.evTab=ds.evtab;render();return}
+  if(ds.presentacion){e.preventDefault();openSheet({type:"presentacion",id:ds.presentacion});return}
+  if(ds.editPres){openSheet({type:"presForm",id:ds.editPres});return}
+  if(ds.delPres){const id=ds.delPres;openSheet({type:"confirm",title:"¿Eliminar la presentación?",text:"Se borrará con su convocatoria, repertorio y cierre. Esto no se puede deshacer.",yes:"Eliminar",run:()=>S.db.doc("presentaciones/"+id).delete()});return}
+  if(ds.rsvp){const [k,id,r]=ds.rsvp.split(":"),inst=($("#rsvpInst")||{}).value||"";
+    if(r==="voy"&&!antiguedadOk(S.myId)){toast("Un tuno o pardillo debe sumarte.");return}
+    await safe(()=>rsvpWrite(k,id,S.myId,r,inst),r==="voy"?"Confirmaste que vas con "+instName(inst).toLowerCase():"Avisaste que no puedes");return}
+  if(ds.sumar){const [k,id]=ds.sumar.split(":"),who=$("#addMem").value,inst=$("#addInst").value;if(!who)return;
+    await safe(()=>rsvpWrite(k,id,who,"voy",inst),nameOf(who)+" quedó sumado");return}
+  if(ds.quitar){const [k,id,who]=ds.quitar.split(":");await safe(()=>rsvpWrite(k,id,who,"no",instDe(KIND[k].arr().find(x=>x.id===id)||{},who)),nameOf(who)+" quedó como que no va");return}
+  if(ds.etapa){const [k,id,et]=ds.etapa.split(":"),ev=KIND[k].arr().find(x=>x.id===id);if(!ev)return;
+    if(et==="confirmado"&&!quorum(k,ev).ok){openSheet({type:"confirm",title:"¿Confirmar sin quórum?",text:"Todavía no se cumple el mínimo de integrantes o de instrumentos. Puedes confirmar igual si ya está coordinado.",yes:"Confirmar igual",run:()=>setEtapa(k,id,et)});return}
+    if(et==="cancelado"){openSheet({type:"confirm",title:"¿Cancelar este evento?",text:"Quedará como cancelado. Se puede reabrir después.",yes:"Cancelar evento",run:()=>setEtapa(k,id,et)});return}
+    await setEtapa(k,id,et);return}
+  if(ds.wsp){const [k,id]=ds.wsp.split(":"),ev=KIND[k].arr().find(x=>x.id===id);if(!ev)return;window.open("https://wa.me/?text="+encodeURIComponent(wspText(k,ev)),"_blank");return}
+  if(ds.cierre){const [k,id]=ds.cierre.split(":");openSheet({type:"cierreForm",kind:k,id});return}
+  if(ds.aprobar){const [k,id]=ds.aprobar.split(":");await safe(()=>S.db.doc(KIND[k].col+"/"+id).update({repartoAprobado:true,aprobadoPor:S.myId}),"Reparto aprobado");return}
+  if(ds.quitarLocal){const [id,i]=ds.quitarLocal.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;const L2=(p.paradas||[]).filter((x,j)=>j!==+i);
+    await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}),"Local quitado");return}
+  if(ds.repIgual!=null){const neto=+ds.repIgual||0,pct=Math.max(0,Math.min(100,+($("#fondoPct")||{}).value||0)),ins=[...document.querySelectorAll("[data-reparto]")];if(!ins.length)return;
+    const c=Math.floor(neto*(1-pct/100)/ins.length/100)*100;ins.forEach(i=>i.value=c);updateLive();return}
   if(ds.tab){S.tareasTab=ds.tab;if(ds.tab==="mias")S.filterPersona="";render();return}
   if(ds.llamado){openSheet({type:"llamado",id:ds.llamado});return}
   if(ds.editLlamado){openSheet({type:"llamadoForm",id:ds.editLlamado});return}
@@ -1079,7 +1352,7 @@ document.addEventListener("click",async e=>{
     if(ds.resp==="voy"&&!puedeSumarse(l.tipo)){toast("Un tuno debe sumarte.");return}
     await setResp(l,S.myId,ds.resp,ds.resp==="voy"?"Confirmaste que vas":"Avisaste que no puedes");return}
   if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
-  if("repBuild" in ds){const pl=$("#rPl").value,pr=Math.max(1,Math.min(120,Math.round(+$("#rParam").value||PLANTILLAS[pl].def)));
+  if("repBuild" in ds){const pl=$("#rPl").value,pr=readParams(pl);
     const prev=S.repDraft.filter(x=>x.id),used=new Set();
     S.repDraft=PLANTILLAS[pl].build(pr).map(sl=>{const T=SLOT[sl.tipo]||SLOT.any;const k=prev.findIndex((x,i)=>!used.has(i)&&T.ok(x.ritmo));
       if(k<0)return sl;used.add(k);const x=prev[k];return {...sl,id:x.id,titulo:x.titulo,ritmo:x.ritmo}});
@@ -1110,7 +1383,7 @@ document.addEventListener("click",async e=>{
   if(ds.export){exportCsv(ds.export);return}
   if(ds.fest){S.filterEstado=ds.fest;render();return}
   if(ds.open){e.preventDefault();openSheet({type:"task",id:ds.open});return}
-  if(b.id==="fab"){openSheet({type:S.view==="parches"?"parcheForm":S.view==="contratos"?"contratoForm":S.view==="llamados"?"llamadoForm":"form"});return}
+  if(b.id==="fab"){openSheet({type:S.view==="eventos"?(S.evTab==="contratos"?"contratoForm":S.evTab==="presentaciones"?"presForm":"parcheForm"):S.view==="llamados"?"llamadoForm":"form"});return}
   if(ds.edit){openSheet({type:"form",id:ds.edit});return}
   if(ds.split){openSheet({type:"form",padre:ds.split});return}
   if(ds.plazoReq){openSheet({type:"plazo",id:ds.plazoReq});return}
@@ -1122,7 +1395,7 @@ document.addEventListener("click",async e=>{
   if(ds.remove){const id=ds.remove;openSheet({type:"confirm",title:"¿Quitar a "+nameOf(id)+"?",text:"Dejará de aparecer en el planificador. Sus tareas se mantienen.",yes:"Quitar",run:()=>S.db.doc("miembros/"+id).delete()});return}
   if("confirmYes" in ds){const run=S.sheet.run;closeSheet();await safe(run,"Hecho");return}
   if(ds.accept){const r=S.requests.find(x=>x.id===ds.accept);const g=$("#rq-"+CSS.escape(ds.accept))?.value||"aspirante";
-    await safe(async()=>{await S.db.doc("miembros/"+r.id).set({apodo:r.apodo,grado:g,agrupacion:r.agrupacion||AGRUPACION,ingreso:r.ingreso||todayStr(),ingresoMs:msOf(r.ingreso||todayStr()),desde:new Date().toISOString()});await S.db.doc("solicitudes/"+r.id).delete()},r.apodo+" fue aceptado como "+GRADOS[g].toLowerCase());return}
+    await safe(async()=>{await S.db.doc("miembros/"+r.id).set({apodo:r.apodo,grado:g,agrupacion:r.agrupacion||AGRUPACION,ingreso:r.ingreso||todayStr(),ingresoMs:msOf(r.ingreso||todayStr()),instrumentos:r.instrumentos||[],desde:new Date().toISOString()});await S.db.doc("solicitudes/"+r.id).delete()},r.apodo+" fue aceptado como "+GRADOS[g].toLowerCase());return}
   if(ds.reject){await safe(()=>S.db.doc("solicitudes/"+ds.reject).delete(),"Solicitud rechazada");return}
   if("cancelReq" in ds){await safe(()=>S.db.doc("solicitudes/"+S.myId).delete(),"Solicitud cancelada");return}
   if(ds.person){S.view="tareas";S.tareasTab="todas";S.filterPersona=ds.person;S.filterEstado="activas";render();window.scrollTo(0,0);return}
