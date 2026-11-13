@@ -267,6 +267,10 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.sug{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px;background:var(--surface-2)}.sug summary{cursor:pointer;font-size:13.5px}
+.sug ol{margin:8px 0;padding-left:22px;font-size:13.5px}.sug li small{color:var(--muted)}
+.reprog summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--wine-ink)}
+.yo-row td{background:var(--gold-soft);font-weight:600}
 .rep-person{padding:6px 0;border-bottom:1px solid var(--line)}.rep-person:last-child{border-bottom:0}
 .rep-p small{color:var(--muted);font-size:11.5px}
 .desc-d summary{cursor:pointer;font-size:12.5px;color:var(--bad);font-weight:600;padding:4px 0;list-style:none}.desc-d summary::-webkit-details-marker{display:none}
@@ -374,7 +378,7 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
   filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
@@ -441,7 +445,7 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
       ready:{m:!u,t:false,p:false,c:false,l:false,pr:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
@@ -463,6 +467,8 @@ function subscribeAll(fs){
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
 
   unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parchesBase=mine(snap);mergeParches();S.ready.p=true;migrarPriv();render()},()=>{S.ready.p=true;render()}));
+  unsubs.push(fs.collection("sugerencias").onSnapshot(snap=>{S.sugerencias=mine(snap);render()},()=>{}));
+  unsubs.push(fs.collection("repartoMenor").onSnapshot(snap=>{S.repMenor=mine(snap);backfillRepMenor();render()},()=>{}));
   unsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
@@ -821,7 +827,7 @@ function etapaActions(kind,e){const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kin
   if(et==="cancelado")return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small" data-etapa="${kind}:${id}:convocatoria">Reabrir convocatoria</button></div>`;
   return ""}
 
-function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")return"";const L=p.paradas||[],tot=sum(L,x=>x.veces||1),ed=canEditEv("parche",p)&&et!=="cerrado";
+function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")return"";const L=p.paradas||[],tot=sum(L,x=>x.veces||1),ed=(canEditEv("parche",p)||vanIds(p).includes(S.myId))&&et!=="cerrado";
   let h=`<div class="block"><h4>Locales · ${L.length} ${L.length===1?"local":"locales"}, ${tot} ${tot===1?"pasada":"pasadas"}</h4>`;
   const repSongs=(p.repertorio||[]).filter(x=>x.id),pid=esc(p.id);
   const temaSel=i=>`<select class="input tema-sel" data-add-tema="${pid}:${i}" aria-label="Agregar tema tocado en este local"><option value="">+ Agregar tema tocado…</option>${repSongs.length?`<optgroup label="Del repertorio">${repSongs.map(t=>`<option value="${t.id}">${esc(t.titulo)}</option>`).join("")}</optgroup>`:""}<optgroup label="Todo el cancionero">${CANCIONES.map(([id,t])=>`<option value="${id}">${esc(t)}</option>`).join("")}</optgroup></select>`;
@@ -885,7 +891,7 @@ function eventoDetail(kind,e){const et=etapaDe(kind,e);markSeen(e);let info="";
   const ek=kind==="presentacion"?"pres":kind;
   return `<h2>${esc(KIND[kind].title(e))}</h2>${stepper(et)}
   <div class="block"><dl class="kv">${info}</dl>${e.notas?`<p class="desc" style="margin-top:10px">${esc(e.notas)}</p>`:""}</div>
-  ${etapaActions(kind,e)}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+(isTuno()?parcheMoney(e):""):""}${kind==="contrato"&&isTuno()?contratoMoney(e):""}${cierreBlock(kind,e)}${kind==="parche"&&etapaDe("parche",e)!=="convocatoria"?notasParcheBlock(e):""}
+  ${etapaActions(kind,e)}${kind==="parche"?reprogBlock(e):""}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+(isTuno()?parcheMoney(e):""):""}${kind==="contrato"&&isTuno()?contratoMoney(e):""}${cierreBlock(kind,e)}${kind==="parche"&&etapaDe("parche",e)!=="convocatoria"?notasParcheBlock(e):""}
   ${canEditEv(kind,e)?`<div class="btn-row"><button class="btn" data-edit-${ek}="${esc(e.id)}">Editar datos</button>${(kind==="parche"?canEditEv(kind,e):isTuno())?`<button class="btn danger" data-del-${ek}="${esc(e.id)}">Eliminar</button>`:""}</div>`:""}`}
 
 function viewPresentaciones(){
@@ -957,6 +963,17 @@ function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.clien
     Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
   return h}
 
+// ---------- reprogramación de parches ----------
+function reprogBlock(p){const et=etapaDe("parche",p);if(!["convocatoria","confirmado"].includes(et))return"";
+  const sol=Object.entries(p.solicitudesFecha||{}),mia=(p.solicitudesFecha||{})[S.myId],ed=canEditEv("parche",p);
+  let h="";
+  if(ed&&sol.length)h+=`<div class="block stage"><h4>Solicitudes de cambio de fecha · ${sol.length}</h4>${sol.map(([id,x])=>`<div class="nota-p"><div class="who"><b>${esc(nameOf(id))}</b> propone <b>${fmtDateDia(x.fecha)}${x.hora?", "+esc(x.hora):""}</b></div>${x.motivo?`<p>${esc(x.motivo)}</p>`:""}
+      <div class="btn-row" style="margin-top:6px"><button class="btn small gold" data-reprog-ok="${esc(p.id)}:${esc(id)}">Aceptar y cambiar fecha</button><button class="btn small" data-reprog-no="${esc(p.id)}:${esc(id)}">Rechazar</button></div></div>`).join("")}</div>`;
+  if(!ed){if(mia)h+=`<div class="callout warn">Pediste cambiar la fecha a <b>${fmtDateDia(mia.fecha)}</b>. Espera la respuesta de quien administra el parche. <button class="btn small" data-reprog-cancel="${esc(p.id)}">Cancelar solicitud</button></div>`;
+    else h+=`<details class="block reprog"><summary>¿No te acomoda la fecha? Solicitar reprogramación</summary><form class="f" id="reprogForm" style="margin-top:10px"><div class="two"><div class="field"><label for="rgFecha">Nueva fecha</label><input type="date" id="rgFecha" required min="${todayStr()}"></div><div class="field"><label for="rgHora">Hora</label><input type="time" id="rgHora"></div></div>
+      <div class="field"><label for="rgMot">Motivo</label><input type="text" id="rgMot" maxlength="120" required placeholder="Ej: ese día hay certamen en la U"></div><button class="btn small primary" type="submit">Enviar solicitud</button></form></details>`}
+  return h}
+
 // ---------- apreciaciones, comentarios y castigos del parche ----------
 const notasDe=pid=>S.notasParche.filter(n=>n.parche===pid).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
 function notasParcheBlock(p){const L=notasDe(p.id),pid=esc(p.id);
@@ -971,6 +988,22 @@ function notasParcheBlock(p){const L=notasDe(p.id),pid=esc(p.id);
   return `${cas.length?`<div class="block castigo-b"><h4>Castigo para ti</h4>${cas.map(item).join("")}</div>`:""}
   <div class="block"><h4>Mis apreciaciones</h4><p class="chart-note" style="margin-top:0">Lo que escribas aquí solo lo verán los tunos.</p>${mias.map(item).join("")}
     <form class="f nota-form" data-notap="apreciacion:${pid}"><textarea id="npApr" maxlength="600" placeholder="¿Qué te pareció el parche? ¿Qué mejorarías?" required></textarea><button class="btn small primary" type="submit">Enviar apreciación</button></form></div>`}
+
+// ---------- montos y descuentos de pardillos y aspirantes ----------
+// Al cerrar, se publica aparte lo que recibió cada pardillo/aspirante (sin montos de tunos ni de la caja).
+function repMenorDoc(kind,e,R,D){const m={};Object.keys({...R,...D}).forEach(id=>{if(grado(id)&&grado(id)!=="tuno")m[id]={monto:+R[id]||0,descuento:+(D[id]||{}).monto||0,motivo:(D[id]||{}).motivo||""}});
+  return {kind,evento:e.id,fecha:e.fecha,titulo:KIND[kind].title(e),montos:m,agrupacion:AGRUPACION}}
+const repMenorBack=new Set();
+function backfillRepMenor(){if(!(isTuno()||S.isOwner)||!S.db)return;const ya=new Set(S.repMenor.map(x=>x.id));
+  [...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e])].forEach(([k,e])=>{const id=k+"_"+e.id;
+    if(etapaDe(k,e)!=="cerrado"||!e.reparto||ya.has(id)||repMenorBack.has(id))return;repMenorBack.add(id);
+    S.db.doc("repartoMenor/"+id).set(repMenorDoc(k,e,e.reparto||{},e.descuentos||{})).catch(()=>{})})}
+function montosMenoresKpi(ini,hoy){const L=S.repMenor.filter(x=>(x.fecha||"")>=ini&&(x.fecha||"")<=hoy);if(!L.length)return"";const per={},desc=[];
+  L.forEach(x=>Object.entries(x.montos||{}).forEach(([id,v])=>{const o=per[id]=per[id]||{id,m:0,d:0,n:0};o.m+=+v.monto||0;o.d+=+v.descuento||0;o.n++;if(+v.descuento)desc.push({id,v,x})}));
+  const rows=Object.values(per).sort((a,b)=>b.m-a.m);if(!rows.length)return"";
+  return `<div class="block"><h4>Montos recibidos · pardillos y aspirantes</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Integrante</th><th class="num">Eventos</th><th class="num">Recibido</th><th class="num">Descuentos</th></tr></thead><tbody>${
+    rows.map(r=>`<tr class="${r.id===S.myId?"yo-row":""}"><td>${esc(nameOf(r.id))}${r.id===S.myId?" (tú)":""} <small style="color:var(--muted)">${GRADOS[grado(r.id)]||""}</small></td><td class="num">${r.n}</td><td class="num">${clp(r.m)}</td><td class="num ${r.d?"neg":""}">${r.d?"−"+clp(r.d):"—"}</td></tr>`).join("")}</tbody></table></div>
+    ${desc.length?`<p class="rep-g">Descuentos realizados</p>${desc.sort((a,b)=>(b.x.fecha||"").localeCompare(a.x.fecha||"")).map(({id,v,x})=>`<div class="nota-p castigo"><div class="who"><b>${esc(nameOf(id))}</b> · ${esc(x.titulo)} · ${fmtDate(x.fecha)}</div><p>−${clp(v.descuento)}${v.motivo?": "+esc(v.motivo):""}</p></div>`).join("")}`:""}</div>`}
 
 // ---------- caja de la Tuna ----------
 const CAT_CAJA={ingreso:["Cuotas","Donación","Venta","Saldo inicial","Otro ingreso"],egreso:["Cuerdas e instrumentos","Vestuario","Viajes y certámenes","Transporte","Alimentación","Otro gasto"]};
@@ -1061,10 +1094,12 @@ function viewKpi(){
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
   const tk=tareasKpi(ini,hoy),ck=cancionesKpi(P,C,ini,hoy);
-  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+tk+exportBlock();
+  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+montosMenoresKpi(ini,hoy)+tk+exportBlock();
   const netoP=sum(P,parcheNeto),cobr=sum(C,c=>c.monto),cost=sum(C,costosTotal),utilC=cobr-cost,attP=sum(P,att),attC=sum(C,att),nEv=P.length+C.length;
   const mids=Object.keys(S.members),uniq=new Set([...P,...C].flatMap(e=>e.asistentes||[]).filter(id=>S.members[id]));
+  const PR=S.presentaciones.filter(e=>e.fecha>=ini&&e.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("presentacion",e)));
   if(!isTuno()){h+=`<div class="kpis"><div class="kpi"><span>Parches</span><b>${P.length}</b><small>${attP} asistencias</small></div><div class="kpi"><span>Contratos</span><b>${C.length}</b><small>${attC} asistencias</small></div>
+      <div class="kpi"><span>Presentaciones</span><b>${PR.length}</b><small>${sum(PR,att)} asistencias</small></div><div class="kpi"><span>Tu asistencia</span><b>${[...P,...C,...PR].filter(e=>(e.asistentes||[]).includes(S.myId)).length}</b><small>eventos en el período</small></div>
       <div class="kpi"><span>Integrantes por evento</span><b>${fmtCount((attP+attC)/nEv)}</b><small>asistencia promedio</small></div><div class="kpi"><span>Participaron</span><b>${uniq.size} de ${mids.length}</b><small>${mids.length?Math.round(uniq.size/mids.length*100):0}% de la Tuna</small></div></div>`}
   else h+=`<div class="kpis">
     <div class="kpi hero solo-t"><span>Total generado en el período</span><b>${clp(netoP+utilC)}</b><small>Parches ${clp(netoP)} · Contratos ${clp(utilC)}</small></div>
@@ -1087,7 +1122,7 @@ function viewKpi(){
   if(P.length&&isTuno()){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
     h+=chartBlock("Recaudación por parche"+(P.length>12?" · últimos 12":""),null,barsChart(lp.map(p=>+p.fecha.slice(8)+"/"+(+p.fecha.slice(5,7))),[s],fmtMoneyShort,
       i=>{const p=lp[i],n=att(p);return `${p.lugar||"Parche"} · ${fmtDate(p.fecha)}\nNeto: ${clp(parcheNeto(p))}\n${n} asistente${n===1?"":"s"}${n?" · "+clp(parcheNeto(p)/n)+" c/u":""}`}),"Monto neto de cada parche, en orden de fecha.","solo-t")}
-  h+=ck+fondoKpi(P,C);
+  h+=ck+montosMenoresKpi(ini,hoy)+fondoKpi(P,C);
   const rows=mids.map(id=>({id,p:P.filter(e=>(e.asistentes||[]).includes(id)).length,c:C.filter(e=>(e.asistentes||[]).includes(id)).length}))
     .sort((a,b)=>(b.p+b.c)-(a.p+a.c)||nameOf(a.id).localeCompare(nameOf(b.id)));
   const act=rows.filter(r=>r.p+r.c),zero=rows.filter(r=>!(r.p+r.c)),mxr=Math.max(1,...act.map(r=>r.p+r.c));
@@ -1200,7 +1235,8 @@ function repSlotsHtml(){let g=null,h="";
       <select class="input" id="rs${i}" data-rep-slot="${i}"><option value="">— Elegir canción —</option>${opts.map(([id,t,r])=>`<option value="${id}" ${sl.id===id?"selected":""}>${esc(t)} · ${esc(r||"Sin estilo")}</option>`).join("")}</select></div>
       <span class="rep-mv"><button type="button" class="btn small" data-rep-mv="${i}:-1" aria-label="Subir canción" ${i?"":"disabled"}>↑</button><button type="button" class="btn small" data-rep-mv="${i}:1" aria-label="Bajar canción" ${i<S.repDraft.length-1?"":"disabled"}>↓</button></span></div>`});
   return h+`<p class="chart-note" id="repCount">${repCountTxt()}</p>`}
-function repForm(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=PLANTILLAS[rp.id]?rp.id:DEF_PLANTILLA[o.kind],vals=rp.params||(rp.param!=null?[rp.param]:null);
+function repForm(o){if(o.sug)return repFormInner(o).replace("<h2>Repertorio</h2>","<h2>Sugerir repertorio</h2>").replace('<button class="btn primary" type="submit">Guardar repertorio</button>','<div class="field"><label for="sugCom">Comentario para quien arma el repertorio (opcional)</label><textarea id="sugCom" maxlength="300" placeholder="Ej: probemos abrir con un vals"></textarea></div><button class="btn primary" type="submit">Enviar sugerencia</button>');return repFormInner(o)}
+function repFormInner(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=PLANTILLAS[rp.id]?rp.id:DEF_PLANTILLA[o.kind],vals=rp.params||(rp.param!=null?[rp.param]:null);
   if(!S.repDraft)S.repDraft=(ev.repertorio&&ev.repertorio.length)?ev.repertorio.map(x=>({...x})):PLANTILLAS[pl].build(vals||PLANTILLAS[pl].params.map(p=>p.d));
   return `<h2>Repertorio</h2><p class="chart-note" style="margin:-6px 0 12px">${esc(evTitle(o.kind,ev))}</p>
   <form class="f" id="repForm">
@@ -1214,7 +1250,13 @@ function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<d
   if(!r.length)h+=`<p class="muted-p">${isTuno()?"Aún no se arma el repertorio de este evento.":"El repertorio aún no está definido."}</p>`;
   else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
     h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`}
-  if(kind==="llamado"?isTuno():canEditEv(kind,ev)&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
+  const puedeEd=kind==="llamado"?isTuno():canEditEv(kind,ev)&&etapaDe(kind,ev)!=="cerrado";
+  if(puedeEd)h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
+  else if(kind!=="llamado"&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small" style="margin-top:12px" data-rep-sug="${kind}:${esc(ev.id)}">Sugerir repertorio</button>`;
+  const sg=kind==="llamado"?[]:S.sugerencias.filter(x=>x.evento===ev.id&&x.kind===kind);
+  if(sg.length)h+=`<p class="rep-g">Sugerencias · ${sg.length}</p>${sg.map(x=>{const L=(x.repertorio||[]).filter(t=>t.id);
+    return `<details class="sug"><summary><b>${esc(nameOf(x.autor))}</b> · ${L.length} canciones · ${fmtTs(x.fecha)}</summary><ol>${L.map(t=>`<li>${esc(t.titulo)} <small>${esc(t.ritmo)}</small></li>`).join("")}</ol>
+      ${x.comentario?`<p class="desc">${esc(x.comentario)}</p>`:""}<div class="btn-row">${puedeEd?`<button class="btn small gold" data-sug-usar="${esc(x.id)}">Usar este repertorio</button>`:""}${puedeEd||x.autor===S.myId?`<button class="btn small" data-sug-del="${esc(x.id)}">Eliminar</button>`:""}</div></details>`}).join("")}`;
   return h+`</div>`}
 function cancionesKpi(P,C,ini,hoy){
   const L=[...S.presAll,...S.presentaciones.filter(e=>["realizado","cerrado"].includes(etapaDe("presentacion",e)))].filter(l=>l.fecha>=ini&&l.fecha<=hoy),cnt={};
@@ -1236,21 +1278,21 @@ function cancionesKpi(P,C,ini,hoy){
 
 // ---------- tareas cumplidas (solo tunos) ----------
 function tareasKpi(ini,hoy){
-  if(!isTuno())return"";
+  const TT=isTuno()?S.tasks:S.tasks.filter(t=>(t.asignados||[]).some(id=>grado(id)&&grado(id)!=="tuno"));
   const fin=t=>(t.completada||t.actualizado||t.fechaLimite||"").slice(0,10);
   const aTiempo=t=>t.aTiempo!=null?t.aTiempo:(!t.fechaLimite||fin(t)<=t.fechaLimite);
-  const done=S.tasks.filter(t=>t.estado==="realizada"&&fin(t)>=ini&&fin(t)<=hoy),act=S.tasks.filter(t=>t.estado!=="realizada");
+  const done=TT.filter(t=>t.estado==="realizada"&&fin(t)>=ini&&fin(t)<=hoy),act=TT.filter(t=>t.estado!=="realizada");
   const has=(t,id)=>(t.asignados||[]).includes(id);
-  const rows=Object.keys(S.members).map(id=>{const d=done.filter(t=>has(t,id));return {id,d:d.length,ok:d.filter(aTiempo).length,a:act.filter(t=>has(t,id)).length,v:act.filter(t=>has(t,id)&&t.fechaLimite&&t.fechaLimite<hoy).length}});
+  const rows=Object.keys(S.members).filter(id=>isTuno()||grado(id)!=="tuno").map(id=>{const d=done.filter(t=>has(t,id));return {id,d:d.length,ok:d.filter(aTiempo).length,a:act.filter(t=>has(t,id)).length,v:act.filter(t=>has(t,id)&&t.fechaLimite&&t.fechaLimite<hoy).length}});
   const okAll=done.filter(aTiempo).length;
   const mx=Math.max(1,...rows.map(r=>r.d)),top=rows.filter(r=>r.d).sort((a,b)=>b.d-a.d||nameOf(a.id).localeCompare(nameOf(b.id)));
-  return `<p class="group-label solo-lbl">Tareas y misiones</p>
+  return `<p class="group-label ${isTuno()?"solo-lbl":""}">Tareas y misiones${isTuno()?"":" · pardillos y aspirantes"}</p>
   <div class="kpis"><div class="kpi"><span>Tareas cumplidas</span><b>${done.length}</b><small>${done.filter(t=>t.padre).length} son subtareas</small></div>
     <div class="kpi"><span>Cumplidas a tiempo</span><b>${done.length?Math.round(okAll/done.length*100)+"%":"—"}</b><small>${okAll} de ${done.length}</small></div>
     <div class="kpi"><span>Activas ahora</span><b>${act.length}</b><small>sin completar</small></div>
     <div class="kpi"><span>Vencidas ahora</span><b class="${act.some(t=>t.fechaLimite&&t.fechaLimite<hoy)?"neg":""}">${act.filter(t=>t.fechaLimite&&t.fechaLimite<hoy).length}</b><small>pasaron su fecha límite</small></div></div>
   <div class="block"><h4>Cumplimiento por grado</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Grado</th><th class="num">Cumplidas</th><th class="num">A tiempo</th><th class="num">Activas</th><th class="num">Vencidas</th></tr></thead><tbody>${
-    ["tuno","pardillo","aspirante"].map(g=>{const r=rows.filter(x=>grado(x.id)===g),d=sum(r,x=>x.d),ok=sum(r,x=>x.ok);
+    (isTuno()?["tuno","pardillo","aspirante"]:["pardillo","aspirante"]).map(g=>{const r=rows.filter(x=>grado(x.id)===g),d=sum(r,x=>x.d),ok=sum(r,x=>x.ok);
       return `<tr><td>${GRADOS[g]}s</td><td class="num">${d}</td><td class="num">${d?Math.round(ok/d*100)+"%":"—"}</td><td class="num">${sum(r,x=>x.a)}</td><td class="num ${sum(r,x=>x.v)?"neg":""}">${sum(r,x=>x.v)}</td></tr>`}).join("")}</tbody></table></div>
     <p class="chart-note">Una tarea con varios responsables cuenta para cada uno.</p></div>
   <div class="block"><h4>Tareas cumplidas por integrante</h4>${top.length?`<div class="rank">${top.map(r=>`<div class="rank-row" data-tip="${esc(nameOf(r.id)+" ("+GRADOS[grado(r.id)]+")\nCumplidas: "+r.d+" · a tiempo: "+r.ok+"\nActivas: "+r.a+" · vencidas: "+r.v)}"><span class="rank-name">${esc(nameOf(r.id))}</span><span class="rank-bar"><span style="width:${r.d/mx*100}%;background:var(--info)"></span></span><span class="rank-n">${r.d}</span></div>`).join("")}</div>`:`<p class="muted-p">Nadie ha completado tareas en este período.</p>`}</div>`}
@@ -1409,6 +1451,11 @@ document.addEventListener("submit",async e=>{
       await safe(()=>tref(o.id).update({...data,actualizado:new Date().toISOString()}),"Cambios guardados");openSheet({type:"task",id:o.id})}
     else{const id=uid();await safe(()=>tref(id).set({...data,estado:"pendiente",fechaLimiteOriginal:fecha,creadoPor:S.myId,agrupacion:AGRUPACION,padre:o.padre||null,notas:[],solicitudPlazo:null,creado:new Date().toISOString()}),"Tarea creada");
       if(o.padre)openSheet({type:"task",id:o.padre});else closeSheet()}}
+  if(f.id==="repForm"&&S.sheet&&S.sheet.sug){const o=S.sheet,pl=$("#rPl").value,pr=readParams(pl);
+    const repertorio=S.repDraft.map(x=>({tipo:x.tipo,grupo:x.grupo,id:x.id||"",titulo:x.titulo||"",ritmo:x.ritmo||""}));
+    if(!repertorio.some(x=>x.id)){toast("Elige al menos una canción.");return}
+    await safe(()=>S.db.doc("sugerencias/"+uid()).set({kind:o.kind,evento:o.id,autor:S.myId,repertorio,repPlantilla:{id:pl,params:pr},comentario:($("#sugCom")||{}).value||"",fecha:new Date().toISOString(),agrupacion:AGRUPACION}),"Sugerencia enviada");
+    openSheet({type:o.kind,id:o.id});return}
   if(f.id==="repForm"){const o=S.sheet,ev=evFor(o.kind,o.id);if(!ev)return;
     const pl=$("#rPl").value,pr=readParams(pl);
     const repertorio=S.repDraft.map(x=>({tipo:x.tipo,grupo:x.grupo,id:x.id||"",titulo:x.titulo||"",ritmo:x.ritmo||""}));
@@ -1463,11 +1510,14 @@ document.addEventListener("submit",async e=>{
       Object.assign(upd,{reparto:R,repartoBruto:RB,descuentos:DS,descuentosTotal:dtot,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
       if(isTuno())upd.repartoAprobado=true;
       if(k==="contrato")upd.estado=$("#pagoOk")&&$("#pagoOk").checked?"pagado":"realizado"}
+    if(k!=="presentacion"&&upd.reparto)S.db.doc("repartoMenor/"+k+"_"+o.id).set(repMenorDoc(k,e,upd.reparto,upd.descuentos||{})).catch(()=>{});
     if(k==="parche"){const base={etapa:upd.etapa,cerradoEn:upd.cerradoEn,cerradoPor:upd.cerradoPor},priv={};
       ["bitacora","reparto","repartoBruto","descuentos","descuentosTotal","fondoTuna","fondoPct","repartoAprobado"].forEach(x=>{if(upd[x]!==undefined)priv[x]=upd[x]});priv.agrupacion=AGRUPACION;
       await safe(async()=>{await privWrite(o.id,priv);await S.db.doc("parches/"+o.id).update(base)},"Parche cerrado")}
     else await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");
     openSheet({type:k,id:o.id});return}
+  if(f.id==="reprogForm"){const pid=S.sheet&&S.sheet.id;if(!pid)return;
+    await safe(()=>S.db.doc("parches/"+pid).update({["solicitudesFecha."+S.myId]:{fecha:$("#rgFecha").value,hora:$("#rgHora").value,motivo:$("#rgMot").value.trim(),at:new Date().toISOString()}}),"Solicitud enviada a quien administra el parche");return}
   if(f.id==="localForm"){const pid=S.sheet&&S.sheet.id,nom=$("#lcNombre").value.trim();if(!pid||!nom)return;
     const x={local:nom,veces:Math.max(1,Math.round(+$("#lcVeces").value||1)),nota:$("#lcNota").value.trim(),at:new Date().toISOString(),por:S.myId};
     $("#lcNombre").value="";$("#lcNota").value="";$("#lcVeces").value="1";
@@ -1549,6 +1599,10 @@ document.addEventListener("click",async e=>{
   if(ds.cierre){const [k,id]=ds.cierre.split(":");openSheet({type:"cierreForm",kind:k,id});return}
   if(ds.aprobar){const [k,id]=ds.aprobar.split(":"),d={repartoAprobado:true,aprobadoPor:S.myId};
     await safe(()=>k==="parche"?privWrite(id,d):S.db.doc(KIND[k].col+"/"+id).update(d),"Reparto aprobado");return}
+  if(ds.reprogOk||ds.reprogNo){const [pid,who]=(ds.reprogOk||ds.reprogNo).split(":"),p=S.parches.find(x=>x.id===pid);if(!p)return;const x=(p.solicitudesFecha||{})[who];if(!x)return;
+    const upd={["solicitudesFecha."+who]:firebase.firestore.FieldValue.delete()};if(ds.reprogOk){upd.fecha=x.fecha;if(x.hora)upd.hora=x.hora}
+    await safe(()=>S.db.doc("parches/"+pid).update(upd),ds.reprogOk?"Fecha cambiada a "+fmtDate(x.fecha):"Solicitud rechazada");return}
+  if(ds.reprogCancel){await safe(()=>S.db.doc("parches/"+ds.reprogCancel).update({["solicitudesFecha."+S.myId]:firebase.firestore.FieldValue.delete()}),"Solicitud cancelada");return}
   if(ds.delNotap){const id=ds.delNotap;await safe(()=>S.db.doc("notasParche/"+id).delete(),"Eliminado");return}
   if(ds.veces){const [id,i,d]=ds.veces.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;
     const L2=(p.paradas||[]).map((x,j)=>j===+i?{...x,veces:Math.max(1,Math.min(20,(x.veces||1)+(+d)))}:x);
@@ -1569,6 +1623,10 @@ document.addEventListener("click",async e=>{
     if(ds.resp==="voy"&&!puedeSumarse(l.tipo)){toast("Un tuno debe sumarte.");return}
     await setResp(l,S.myId,ds.resp,ds.resp==="voy"?"Confirmaste que vas":"Avisaste que no puedes");return}
   if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
+  if(ds.repSug){const [k,id]=ds.repSug.split(":");openSheet({type:"repForm",kind:k,id,sug:true});return}
+  if(ds.sugUsar){const x=S.sugerencias.find(y=>y.id===ds.sugUsar);if(!x)return;const col=KIND[x.kind].col;
+    await safe(()=>S.db.doc(col+"/"+x.evento).update({repertorio:x.repertorio,repPlantilla:x.repPlantilla||null}),"Repertorio actualizado con la sugerencia de "+nameOf(x.autor));return}
+  if(ds.sugDel){const id=ds.sugDel;await safe(()=>S.db.doc("sugerencias/"+id).delete(),"Sugerencia eliminada");return}
   if("repBuild" in ds){const pl=$("#rPl").value,pr=readParams(pl);
     const prev=S.repDraft.filter(x=>x.id),used=new Set();
     S.repDraft=PLANTILLAS[pl].build(pr).map(sl=>{const T=SLOT[sl.tipo]||SLOT.any;const k=prev.findIndex((x,i)=>!used.has(i)&&T.ok(x.ritmo));
