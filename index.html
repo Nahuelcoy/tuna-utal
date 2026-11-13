@@ -423,7 +423,7 @@ function plazoCheck(t){
   const orig=t.fechaLimiteOriginal||t.fechaLimite;
   if(orig&&daysBetween(todayStr(),orig)<0)return {show:true,ok:false,why:"El plazo original ("+fmtDate(orig)+") ya pasó, así que no se puede pedir una nueva fecha."};
   const nota=(t.notas||[]).find(n=>n.tipo==="requiere_plazo"&&n.autor===S.myId&&!n.usada);
-  if(!nota)return {show:true,ok:false,why:"Primero agrega una nota marcando «Necesito más plazo» explicando por qué."};
+  if(!nota)return {show:true,ok:false,why:"Para pedir reprogramación, primero agrega una nota marcando «Necesito más plazo» explicando por qué."};
   return {show:true,ok:true,nota};
 }
 
@@ -1387,7 +1387,7 @@ function taskDetail(t){
   </div>
   ${sp?`<div class="callout warn"><b>${esc(nameOf(sp.por))}</b> pidió cambiar la fecha a <b>${fmtDate(sp.nuevaFecha)}</b>. Motivo: ${esc(sp.motivo)}
      ${isTuno()?`<div class="btn-row" style="margin-top:8px"><button class="btn small gold" data-plazo-ok="${esc(t.id)}">Aprobar</button><button class="btn small danger" data-plazo-no="${esc(t.id)}">Rechazar</button></div>`:""}</div>`:""}
-  ${pc.show?`<div class="block"><h4>Plazo</h4>${pc.ok?`<button class="btn gold" data-plazo-req="${esc(t.id)}">Solicitar nueva fecha</button>`:`<p style="margin:0;font-size:13.5px;color:var(--muted)">${esc(pc.why)}</p>`}</div>`:""}
+  ${pc.show?`<div class="block"><h4>Reprogramación</h4>${pc.ok?`<button class="btn gold" data-plazo-req="${esc(t.id)}">Solicitar reprogramación</button>`:`<p style="margin:0;font-size:13.5px;color:var(--muted)">${esc(pc.why)}</p>`}</div>`:""}
   ${subs.length?`<div class="block"><h4>Subtareas</h4><div class="list">${sortTasks(subs).map(taskCard).join("")}</div></div>`:""}
   <div class="block"><h4>Información y avances</h4>
     <div class="notes">${(t.notas||[]).length?(t.notas||[]).map(n=>`<div class="note ${esc(n.tipo)}"><div class="who"><b>${esc(nameOf(n.autor))}</b> · ${fmtTs(n.fecha)}${n.tipo==="requiere_plazo"?" · necesita más plazo":""}</div><p>${esc(n.texto)}</p></div>`).join(""):`<p style="margin:0;color:var(--muted);font-size:14px">Sin notas todavía.</p>`}</div>
@@ -1420,7 +1420,7 @@ function taskForm(o){
   </form>`}
 function plazoForm(t){
   const orig=t.fechaLimiteOriginal||t.fechaLimite;const min=t.fechaLimite>todayStr()?t.fechaLimite:todayStr();
-  return `<h2>Solicitar nueva fecha</h2>
+  return `<h2>Solicitar reprogramación</h2>
   <div class="callout info">Fecha actual: <b>${fmtDate(t.fechaLimite)}</b>. Puedes pedirlo hasta el ${fmtDate(orig)}, el plazo fijado originalmente. Un tuno debe aprobarlo.</div>
   <form class="f" id="plazoForm"><div class="field"><label for="pFecha">Nueva fecha que propones</label><input type="date" id="pFecha" required min="${esc(min)}"></div>
   <div class="field"><label for="pMotivo">Motivo</label><textarea id="pMotivo" required maxlength="300">${esc(plazoCheck(t).nota?.texto||"")}</textarea></div>
