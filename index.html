@@ -267,6 +267,7 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.solo-tunos{color:var(--gold-ink);font-weight:600}
 .locales{display:flex;flex-direction:column}
 .local{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}.local:last-child{border-bottom:0}
 .veces{display:flex;align-items:center;gap:2px;font-variant-numeric:tabular-nums}.veces .chip-x{font-size:18px;padding:0 8px;min-height:32px}
@@ -435,9 +436,10 @@ function subscribeAll(fs){
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   unsubs.push(fs.collection("miembros").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.data();if(v&&(v.agrupacion||AGRUPACION)===AGRUPACION)m[d.id]=v});
     S.members=m;S.ready.m=true;
+    subTareas(fs);
     if(isTuno()&&!reqSub){reqSub=true;unsubs.push(fs.collection("solicitudes").onSnapshot(sn=>{S.requests=sn.docs.map(d=>({id:d.id,...d.data()}));loadProfiles();render()},()=>{}))}
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
-  unsubs.push(fs.collection("tareas").onSnapshot(snap=>{S.tasks=mine(snap);S.ready.t=true;render()},()=>{S.ready.t=true;render()}));
+
   unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parches=mine(snap);S.ready.p=true;render()},()=>{S.ready.p=true;render()}));
   unsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
@@ -448,6 +450,17 @@ function subscribeAll(fs){
   unsubs.push(fs.collection("llamados").where("tipo","==","presentacion").onSnapshot(snap=>{S.presAll=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("respuestas").where("fechaLlamado",">=",cut).onSnapshot(snap=>{S.respuestas=mine(snap);render()},()=>{}));
 }
+// Tareas: los tunos ven todas; pardillos y aspirantes solo las que no son exclusivas de tunos.
+let tareasModo=null,tareasUnsub=null;const backfilled=new Set();
+const visDe=asg=>(asg||[]).length&&(asg||[]).every(id=>grado(id)==="tuno")?"tunos":"todos";
+function subTareas(fs){const modo=isTuno()?"todas":me()?"todos":null;if(!modo||modo===tareasModo)return;
+  tareasModo=modo;if(tareasUnsub){try{tareasUnsub()}catch(e){}}
+  const q=modo==="todas"?fs.collection("tareas"):fs.collection("tareas").where("visibilidad","==","todos");
+  const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
+  tareasUnsub=q.onSnapshot(snap=>{S.tasks=mine(snap);S.ready.t=true;
+    if(modo==="todas")S.tasks.forEach(t=>{const v=visDe(t.asignados);if(t.visibilidad!==v&&!backfilled.has(t.id+v)){backfilled.add(t.id+v);fs.doc("tareas/"+t.id).update({visibilidad:v}).catch(()=>{})}});
+    render()},()=>{S.ready.t=true;render()});
+  unsubs.push(()=>{if(tareasUnsub)tareasUnsub();tareasUnsub=null;tareasModo=null})}
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
 
 // ---------- render ----------
@@ -495,7 +508,7 @@ function taskCard(t){
     <span class="stripe"></span><span class="body">
       <span class="row"><span class="cat">${esc(t.categoria||"Otra")}</span><span class="pill st-${esc(t.estado)}">${ESTADOS[t.estado]||"Pendiente"}</span>${t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente"?'<span class="pill pl-pend">Plazo solicitado</span>':""}</span>
       <h3>${esc(t.titulo)}</h3>
-      <span class="meta"><span class="due ${d.cls}">${d.txt}</span><span>👤 ${esc(asg)}</span>${subs?`<span>${subs} subtarea${subs>1?"s":""}</span>`:""}</span>
+      <span class="meta">${visDe(t.asignados)==="tunos"?'<span class="solo-tunos">🔒 Solo tunos</span>':""}<span class="due ${d.cls}">${d.txt}</span><span>👤 ${esc(asg)}</span>${subs?`<span>${subs} subtarea${subs>1?"s":""}</span>`:""}</span>
     </span></button>`}
 function sortTasks(arr){const pr={alta:0,media:1,baja:2};return arr.slice().sort((a,b)=>{
   if((a.estado==="realizada")!==(b.estado==="realizada"))return a.estado==="realizada"?1:-1;
@@ -1296,7 +1309,7 @@ document.addEventListener("submit",async e=>{
     const o=S.sheet;const asg=[...f.querySelectorAll('input[name=asg]:checked')].map(i=>i.value);
     const fecha=$("#tFecha").value;const parent=o.padre&&S.tasks.find(x=>x.id===o.padre);
     if(parent&&fecha>parent.fechaLimite){toast("La subtarea no puede vencer después que la tarea principal.");return}
-    const data={titulo:$("#tTitulo").value.trim(),descripcion:$("#tDesc").value.trim(),categoria:$("#tCat").value,prioridad:$("#tPrio").value,fechaLimite:fecha,asignados:asg};
+    const data={titulo:$("#tTitulo").value.trim(),descripcion:$("#tDesc").value.trim(),categoria:$("#tCat").value,prioridad:$("#tPrio").value,fechaLimite:fecha,asignados:asg,visibilidad:visDe(asg)};
     if(o.id){const t=S.tasks.find(x=>x.id===o.id);if(t&&fecha!==t.fechaLimite&&!isTuno()&&t.creadoPor===S.myId){/* el creador puede ajustar */}
       await safe(()=>tref(o.id).update({...data,actualizado:new Date().toISOString()}),"Cambios guardados");openSheet({type:"task",id:o.id})}
     else{const id=uid();await safe(()=>tref(id).set({...data,estado:"pendiente",fechaLimiteOriginal:fecha,creadoPor:S.myId,agrupacion:AGRUPACION,padre:o.padre||null,notas:[],solicitudPlazo:null,creado:new Date().toISOString()}),"Tarea creada");
