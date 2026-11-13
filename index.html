@@ -267,6 +267,11 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.mis-bar{display:block;height:6px;border-radius:999px;background:var(--line);overflow:hidden}.mis-bar span{display:block;height:100%;background:var(--ok);border-radius:999px}
+.mis-bar.big{height:10px;margin-bottom:10px}
+.mis-list{display:flex;flex-direction:column}.mis-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 0;border-bottom:1px solid var(--line)}.mis-row:last-child{border-bottom:0}
+.mis-who{flex:1;min-width:0;display:flex;flex-direction:column}.mis-who small{color:var(--muted);font-size:12px}.mis-com{font-style:italic}
+.mis-val,.mis-rp{flex-basis:100%}.mis-rp{font-size:13px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .sug{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:6px;background:var(--surface-2)}.sug summary{cursor:pointer;font-size:13.5px}
 .sug ol{margin:8px 0;padding-left:22px;font-size:13.5px}.sug li small{color:var(--muted)}
 .reprog summary{cursor:pointer;font-weight:600;font-size:13.5px;color:var(--wine-ink)}
@@ -378,8 +383,8 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
-  filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false},error:null,myRequest:null};
+  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false,mi:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
 const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -445,8 +450,8 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
-      ready:{m:!u,t:false,p:false,c:false,l:false,pr:false}});
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+      ready:{m:!u,t:false,p:false,c:false,l:false,pr:false,mi:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
     try{await fs.doc("adminCheck/"+u.uid).get();S.isOwner=true}catch(e){S.isOwner=false}
@@ -462,7 +467,7 @@ function subscribeAll(fs){
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   unsubs.push(fs.collection("miembros").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.data();if(v&&(v.agrupacion||AGRUPACION)===AGRUPACION)m[d.id]=v});
     S.members=m;S.ready.m=true;
-    subTareas(fs);subLlamados(fs);subPrivado(fs);
+    subTareas(fs);subLlamados(fs);subPrivado(fs);subMisiones(fs);
     if(isTuno()&&!reqSub){reqSub=true;unsubs.push(fs.collection("solicitudes").onSnapshot(sn=>{S.requests=sn.docs.map(d=>({id:d.id,...d.data()}));loadProfiles();render()},()=>{}))}
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
 
@@ -549,7 +554,7 @@ function render(){
 function hideChrome(){$("#nav").hidden=true;$("#fab").hidden=true;$("#hdrPeople").hidden=true}
 function showChrome(){
   $("#nav").hidden=false;
-  const fabOn=S.view==="tareas"?canCreate():S.view==="eventos"?isOrg():S.view==="llamados"?!!me():false;
+  const fabOn=S.view==="tareas"?(S.tareasTab==="mistica"?isTuno():canCreate()):S.view==="eventos"?isOrg():S.view==="llamados"?!!me():false;
   $("#fab").hidden=!fabOn;$("#fab").setAttribute("aria-label",S.view==="eventos"?(S.evTab==="contratos"?"Nuevo contrato":S.evTab==="presentaciones"?"Nueva presentación":"Nuevo parche"):S.view==="llamados"?"Nuevo llamado":"Nueva tarea");
   const pend=S.tasks.filter(t=>t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente").length;
   const ic={tareas:'<svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>',
@@ -620,11 +625,12 @@ function viewPlazos(){
     <div class="btn-row" style="margin-top:12px"><button class="btn small gold" data-plazo-ok="${esc(t.id)}">Aprobar</button><button class="btn small danger" data-plazo-no="${esc(t.id)}">Rechazar</button><button class="btn small" data-open="${esc(t.id)}">Ver tarea</button></div></div>`}).join("")
   :`<div class="empty"><strong>No hay solicitudes pendientes</strong>Cuando un pardillo o aspirante pida más plazo, lo verás aquí para aprobarlo o rechazarlo.</div>`}`}
 function viewTareas(){
-  const tabs=[["mias","Mis tareas"],["todas","Todas"]];if(isTuno())tabs.push(["plazos","Plazos"]);
+  const tabs=[["mias","Mis tareas"],["todas","Todas"],["mistica","Mística"]];if(isTuno())tabs.push(["plazos","Plazos"]);
+  const misPend=isTuno()?S.misiones.reduce((n,m)=>n+(m.asignados||[]).filter(id=>progDe(m,id).estado==="cumplida"||(m.reprog||{})[id]).length,0):S.misiones.filter(m=>["pendiente","repetir"].includes(progDe(m,S.myId).estado)&&(m.asignados||[]).includes(S.myId)).length;
   if(S.tareasTab==="plazos"&&!isTuno())S.tareasTab="mias";
   const pend=S.tasks.filter(t=>t.solicitudPlazo&&t.solicitudPlazo.estado==="pendiente").length;
-  const bar=`<div class="subtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${S.tareasTab===k}">${l}${k==="plazos"&&pend?`<span class="count">${pend}</span>`:""}</button>`).join("")}</div>`;
-  return bar+(S.tareasTab==="mias"?viewMine():S.tareasTab==="todas"?viewAll():viewPlazos())}
+  const bar=`<div class="subtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${S.tareasTab===k}">${l}${k==="plazos"&&pend?`<span class="count">${pend}</span>`:""}${k==="mistica"&&misPend?`<span class="count">${misPend}</span>`:""}</button>`).join("")}</div>`;
+  return bar+(S.tareasTab==="mias"?viewMine():S.tareasTab==="todas"?viewAll():S.tareasTab==="mistica"?viewMistica():viewPlazos())}
 
 // ---------- parches y contratos ----------
 const loadingHtml=`<div class="empty"><strong>Cargando…</strong></div>`;
@@ -963,6 +969,68 @@ function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.clien
     Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
   return h}
 
+// ---------- misiones de mística ----------
+// Las asignan los tunos a pardillos y aspirantes. Cada misión la ven solo sus asignados (que ven el avance del grupo) y los tunos.
+let misModo=null,misUnsub=null;
+function subMisiones(fs){const modo=isTuno()?"tuno":(me()?"otro":null);if(!modo||modo===misModo)return;misModo=modo;if(misUnsub){try{misUnsub()}catch(e){}}
+  const q=modo==="tuno"?fs.collection("misiones"):fs.collection("misiones").where("lectores","array-contains",S.myId);
+  misUnsub=q.onSnapshot(snap=>{S.misiones=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);S.ready.mi=true;render()},()=>{S.ready.mi=true;render()});
+  unsubs.push(()=>{if(misUnsub)misUnsub();misUnsub=null;misModo=null})}
+const EST_MIS={pendiente:["Pendiente","st-pendiente"],cumplida:["Por validar","pl-pend"],aprobada:["Aprobada","st-realizada"],repetir:["Repetir","ce-cancelado"]};
+const progDe=(m,id)=>((m.progreso||{})[id])||{estado:"pendiente"};
+const fechaMis=(m,id)=>progDe(m,id).fechaLimite||m.fechaLimite;
+function misAvance(m){const a=m.asignados||[],ap=a.filter(id=>progDe(m,id).estado==="aprobada").length,cu=a.filter(id=>progDe(m,id).estado==="cumplida").length;return {n:a.length,ap,cu,pct:a.length?Math.round(ap/a.length*100):0}}
+function misionCard(m){const av=misAvance(m),mia=(m.asignados||[]).includes(S.myId)?progDe(m,S.myId):null,f=mia?fechaMis(m,S.myId):m.fechaLimite;
+  const dias=f?daysBetween(todayStr(),f):null,venc=dias!=null&&dias<0&&(!mia||["pendiente","repetir"].includes(mia.estado));
+  return `<button class="task mis-card" data-mision="${esc(m.id)}"><span class="stripe" style="background:var(--wine)"></span><span class="body">
+    <span class="row"><span class="cat">Mística</span>${mia?`<span class="pill ${EST_MIS[mia.estado][1]}">${EST_MIS[mia.estado][0]}</span>`:""}${isTuno()&&av.cu?`<span class="pill pl-pend">${av.cu} por validar</span>`:""}${(m.asignados||[]).length>1?'<span class="pill me-pill">Grupal</span>':""}</span>
+    <h3>${esc(m.titulo)}</h3>
+    <span class="mis-bar" aria-label="Avance ${av.pct}%"><span style="width:${av.pct}%"></span></span>
+    <span class="meta"><span>${av.ap} de ${av.n} cumplida${av.n===1?"":"s"}</span><span class="due ${venc?"late":dias!=null&&dias<=3?"soon":""}">${f?(venc?"Vencida hace "+(-dias)+" días":"Vence "+fmtDate(f)):"Sin fecha"}</span></span></span></button>`}
+function viewMistica(){if(!S.ready.mi)return loadingHtml;const L=S.misiones.slice().sort((a,b)=>(a.fechaLimite||"9").localeCompare(b.fechaLimite||"9"));
+  const act=L.filter(m=>misAvance(m).ap<misAvance(m).n),done=L.filter(m=>misAvance(m).ap===misAvance(m).n&&misAvance(m).n);
+  let h=`<div class="section-head"><h2>Mística</h2><span>${isTuno()?L.length+" misiones":"tus misiones"}</span></div>`;
+  if(!L.length)return h+`<div class="empty"><strong>${isTuno()?"Aún no hay misiones de mística":"No tienes misiones de mística"}</strong>${isTuno()?"Toca el botón dorado + para asignar una misión a un pardillo, un aspirante o un grupo.":"Cuando un tuno te asigne una misión, aparecerá aquí."}</div>`;
+  if(act.length)h+=`<p class="group-label">En curso</p><div class="list">${act.map(misionCard).join("")}</div>`;
+  if(done.length)h+=`<p class="group-label">Cumplidas por todo el grupo</p><div class="list">${done.map(misionCard).join("")}</div>`;
+  return h}
+function misionDetail(m){const av=misAvance(m),soy=(m.asignados||[]).includes(S.myId),mia=soy?progDe(m,S.myId):null,fm=soy?fechaMis(m,S.myId):null,rp=(m.reprog||{})[S.myId];
+  let h=`<h2>${esc(m.titulo)}</h2><div class="block"><dl class="kv"><dt>Fecha límite</dt><dd>${fmtDateDia(m.fechaLimite)}${soy&&fm!==m.fechaLimite?` · <b>para ti: ${fmtDateDia(fm)}</b>`:""}</dd><dt>Asignada por</dt><dd>${esc(nameOf(m.creadoPor))}</dd><dt>Asignados</dt><dd>${av.n}</dd></dl>
+    ${m.descripcion?`<p class="desc" style="margin-top:10px">${esc(m.descripcion)}</p>`:""}</div>`;
+  if(soy){h+=`<div class="block stage"><h4>Tu parte · <span class="pill ${EST_MIS[mia.estado][1]}">${EST_MIS[mia.estado][0]}</span></h4>`;
+    if(mia.estado==="aprobada")h+=`<p class="muted-p">Un tuno validó tu misión. ¡Bien hecho!</p>`;
+    else if(mia.estado==="cumplida")h+=`<p class="muted-p">La marcaste como cumplida. Falta que un tuno la valide.</p><button class="btn small" data-mis-estado="${esc(m.id)}:pendiente" style="margin-top:8px">Deshacer</button>`;
+    else h+=`${mia.estado==="repetir"?`<div class="callout warn">Un tuno pidió repetirla${mia.nota?": "+esc(mia.nota):"."}</div>`:""}<form class="f" id="misForm"><textarea id="misCom" maxlength="400" placeholder="Cuenta cómo la cumpliste (opcional)"></textarea><button class="btn gold" type="submit">Marcar como cumplida</button></form>`;
+    if(["pendiente","repetir"].includes(mia.estado)){
+      if(rp)h+=`<div class="callout info" style="margin-top:10px">Pediste reprogramar al <b>${fmtDateDia(rp.fecha)}</b>. Espera la respuesta de un tuno. <button class="btn small" data-mis-reprog-cancel="${esc(m.id)}">Cancelar</button></div>`;
+      else if(fm&&fm>=todayStr())h+=`<details class="reprog" style="margin-top:10px"><summary>Solicitar reprogramación</summary><form class="f" id="misReprogForm" style="margin-top:8px"><div class="field"><label for="mrFecha">Nueva fecha</label><input type="date" id="mrFecha" required min="${esc(fm)}"></div><div class="field"><label for="mrMot">Motivo</label><input type="text" id="mrMot" maxlength="120" required></div><button class="btn small primary" type="submit">Enviar solicitud</button></form></details>`;
+      else if(fm)h+=`<p class="chart-note">El plazo ya venció, así que no se puede pedir reprogramación.</p>`}
+    h+=`</div>`}
+  h+=`<div class="block"><h4>Avance del grupo · ${av.ap} de ${av.n}</h4><span class="mis-bar big"><span style="width:${av.pct}%"></span></span><div class="mis-list">${(m.asignados||[]).map(id=>{const pg=progDe(m,id),r=(m.reprog||{})[id];
+    return `<div class="mis-row"><div class="mis-who"><b>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</b> <small>${GRADOS[grado(id)]||""}</small>${pg.comentario?`<small class="mis-com">"${esc(pg.comentario)}"</small>`:""}${fechaMis(m,id)!==m.fechaLimite?`<small>Plazo: ${fmtDate(fechaMis(m,id))}</small>`:""}</div>
+      <span class="pill ${EST_MIS[pg.estado][1]}">${EST_MIS[pg.estado][0]}</span>
+      ${isTuno()&&pg.estado==="cumplida"?`<div class="btn-row mis-val"><button class="btn small gold" data-mis-val="${esc(m.id)}:${esc(id)}:aprobada">Aprobar</button><button class="btn small" data-mis-val="${esc(m.id)}:${esc(id)}:repetir">Repetir</button></div>`:""}
+      ${isTuno()&&r?`<div class="mis-rp"><span>Pide reprogramar al <b>${fmtDate(r.fecha)}</b>${r.motivo?": "+esc(r.motivo):""}</span> <button class="btn small gold" data-mis-rp="${esc(m.id)}:${esc(id)}:ok">Aceptar</button><button class="btn small" data-mis-rp="${esc(m.id)}:${esc(id)}:no">Rechazar</button></div>`:""}</div>`}).join("")}</div></div>`;
+  if(isTuno())h+=`<div class="btn-row"><button class="btn" data-mis-edit="${esc(m.id)}">Editar</button><button class="btn danger" data-mis-del="${esc(m.id)}">Eliminar</button></div>`;
+  return h}
+function misionForm(o){const m=o.id?S.misiones.find(x=>x.id===o.id):null,v=m||{titulo:"",descripcion:"",fechaLimite:"",asignados:[]};
+  const ids=Object.keys(S.members).filter(id=>grado(id)!=="tuno").sort((a,b)=>(grado(a)>grado(b)?-1:1)||nameOf(a).localeCompare(nameOf(b)));
+  return `<h2>${m?"Editar misión":"Nueva misión de mística"}</h2><form class="f" id="misionForm">
+  <div class="field"><label for="miTit">Misión</label><input type="text" id="miTit" required maxlength="90" value="${esc(v.titulo)}" placeholder="Ej: Aprender la letra de Compostelana"></div>
+  <div class="field"><label for="miDesc">Detalle</label><textarea id="miDesc" maxlength="800" placeholder="Qué deben hacer y cómo se valida">${esc(v.descripcion)}</textarea></div>
+  <div class="field"><label for="miFecha">Fecha límite</label><input type="date" id="miFecha" required value="${esc(v.fechaLimite)}"></div>
+  <div class="field"><label>Asignar a (una persona o un grupo)</label><div class="checks">${ids.map(id=>`<label><input type="checkbox" name="miAsg" value="${esc(id)}" ${(v.asignados||[]).includes(id)?"checked":""}> ${esc(nameOf(id))} <span class="grado g-${grado(id)}" style="margin-left:auto">${GRADOS[grado(id)]}</span></label>`).join("")||'<span style="padding:8px;color:var(--muted)">No hay pardillos ni aspirantes.</span>'}</div>
+    <span class="hint">Cada asignado verá la misión y el avance del grupo. Los demás pardillos y aspirantes no la ven.</span></div>
+  <button class="btn primary" type="submit">${m?"Guardar cambios":"Asignar misión"}</button></form>`}
+function misticaKpi(ini,hoy){const L=S.misiones;if(!L.length)return"";
+  const ids=isTuno()?[...new Set(L.flatMap(m=>m.asignados||[]))]:[S.myId];
+  const rows=ids.map(id=>{const mine=L.filter(m=>(m.asignados||[]).includes(id)),ap=mine.filter(m=>progDe(m,id).estado==="aprobada");
+    const at=ap.filter(m=>{const t=(progDe(m,id).cumplidaEn||"").slice(0,10);return !t||t<=fechaMis(m,id)}).length;
+    return {id,n:mine.length,ap:ap.length,at,pend:mine.filter(m=>["pendiente","repetir"].includes(progDe(m,id).estado)).length}}).filter(r=>r.n).sort((a,b)=>b.ap-a.ap||nameOf(a.id).localeCompare(nameOf(b.id)));
+  if(!rows.length)return"";
+  return `<div class="block ${isTuno()?"solo-t":""}"><h4>${isTuno()?"Avance en mística":"Tu avance en mística"}</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Integrante</th><th class="num">Asignadas</th><th class="num">Cumplidas</th><th class="num">A tiempo</th><th class="num">Pendientes</th></tr></thead><tbody>${
+    rows.map(r=>`<tr class="${r.id===S.myId?"yo-row":""}"><td>${esc(nameOf(r.id))} <small style="color:var(--muted)">${GRADOS[grado(r.id)]||""}</small></td><td class="num">${r.n}</td><td class="num">${r.ap}</td><td class="num">${r.ap?Math.round(r.at/r.ap*100)+"%":"—"}</td><td class="num">${r.pend}</td></tr>`).join("")}</tbody></table></div></div>`}
+
 // ---------- reprogramación de parches ----------
 function reprogBlock(p){const et=etapaDe("parche",p);if(!["convocatoria","confirmado"].includes(et))return"";
   const sol=Object.entries(p.solicitudesFecha||{}),mia=(p.solicitudesFecha||{})[S.myId],ed=canEditEv("parche",p);
@@ -1094,7 +1162,7 @@ function viewKpi(){
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
   const tk=tareasKpi(ini,hoy),ck=cancionesKpi(P,C,ini,hoy);
-  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+montosMenoresKpi(ini,hoy)+tk+exportBlock();
+  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+montosMenoresKpi(ini,hoy)+tk+misticaKpi(ini,hoy)+exportBlock();
   const netoP=sum(P,parcheNeto),cobr=sum(C,c=>c.monto),cost=sum(C,costosTotal),utilC=cobr-cost,attP=sum(P,att),attC=sum(C,att),nEv=P.length+C.length;
   const mids=Object.keys(S.members),uniq=new Set([...P,...C].flatMap(e=>e.asistentes||[]).filter(id=>S.members[id]));
   const PR=S.presentaciones.filter(e=>e.fecha>=ini&&e.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("presentacion",e)));
@@ -1140,7 +1208,7 @@ function viewKpi(){
     const tr=Object.entries(g).map(([t,l])=>{const m=sum(l,c=>c.monto),u=sum(l,contratoUtil);return {t,c:l.length,m,u}}).sort((a,b)=>b.u-a.u);
     h+=`<div class="block solo-t"><h4>Contratos por tipo</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Tipo</th><th class="num">N°</th><th class="num">Cobrado</th><th class="num">Utilidad</th><th class="num">Margen</th></tr></thead><tbody>${
       tr.map(r=>`<tr><td>${esc(r.t)}</td><td class="num">${r.c}</td><td class="num">${clp(r.m)}</td><td class="num">${clp(r.u)}</td><td class="num">${r.m?Math.round(r.u/r.m*100)+"%":"—"}</td></tr>`).join("")}</tbody></table></div></div>`}
-  return h+tk+exportBlock()}
+  return h+tk+misticaKpi(ini,hoy)+exportBlock()}
 async function exportCsv(kind){
   const dl=S.dl;if(!dl){toast("La descarga no está disponible aquí.");return}
   let rows;const names=e=>(e.asistentes||[]).map(nameOf).join(", ");
@@ -1340,7 +1408,7 @@ function joinView(){
 function renderSheet(){
   const L=$("#layer");if(!S.sheet){L.innerHTML="";return}
   // no re-dibujar formularios abiertos mientras se escribe
-  if(!["task","parche","contrato","presentacion","llamado","caja"].includes(S.sheet.type)&&L.firstChild)return;
+  if(!["task","parche","contrato","presentacion","llamado","caja","mision"].includes(S.sheet.type)&&L.firstChild)return;
   const scroll=L.querySelector(".sheet")?.scrollTop||0;
   // conserva lo que se está escribiendo cuando llegan datos nuevos
   const keep={};L.querySelectorAll("input[id],textarea[id],select[id]").forEach(x=>{if(x.type!=="checkbox")keep[x.id]=x.value});
@@ -1358,6 +1426,8 @@ function renderSheet(){
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
   else if(S.sheet.type==="presForm")inner=presForm(S.sheet);
   else if(S.sheet.type==="cierreForm")inner=cierreForm(S.sheet);
+  else if(S.sheet.type==="mision"){const m=S.misiones.find(x=>x.id===S.sheet.id);if(!m){S.sheet=null;L.innerHTML="";return}inner=misionDetail(m)}
+  else if(S.sheet.type==="misionForm")inner=misionForm(S.sheet);
   else if(S.sheet.type==="caja"){if(!isTuno()){S.sheet=null;L.innerHTML="";return}inner=cajaSheet()}
   else if(S.sheet.type==="parcheForm")inner=parcheForm(S.sheet);
   else if(S.sheet.type==="contratoForm")inner=contratoForm(S.sheet);
@@ -1516,6 +1586,14 @@ document.addEventListener("submit",async e=>{
       await safe(async()=>{await privWrite(o.id,priv);await S.db.doc("parches/"+o.id).update(base)},"Parche cerrado")}
     else await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");
     openSheet({type:k,id:o.id});return}
+  if(f.id==="misionForm"){const o=S.sheet,asg=[...f.querySelectorAll("input[name=miAsg]:checked")].map(i=>i.value);if(!asg.length){toast("Elige al menos una persona.");return}
+    const data={titulo:$("#miTit").value.trim(),descripcion:$("#miDesc").value.trim(),fechaLimite:$("#miFecha").value,asignados:asg,lectores:asg};const id=o.id||uid();
+    await safe(()=>o.id?S.db.doc("misiones/"+id).update({...data,actualizado:new Date().toISOString()}):S.db.doc("misiones/"+id).set({...data,progreso:{},reprog:{},creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),o.id?"Misión guardada":"Misión asignada");
+    openSheet({type:"mision",id});return}
+  if(f.id==="misForm"){const id=S.sheet&&S.sheet.id;if(!id)return;
+    await safe(()=>S.db.doc("misiones/"+id).update({["progreso."+S.myId]:{estado:"cumplida",comentario:$("#misCom").value.trim(),cumplidaEn:new Date().toISOString(),fechaLimite:fechaMis(S.misiones.find(x=>x.id===id)||{},S.myId)||""}}),"Marcada como cumplida. Un tuno la validará.");return}
+  if(f.id==="misReprogForm"){const id=S.sheet&&S.sheet.id;if(!id)return;
+    await safe(()=>S.db.doc("misiones/"+id).update({["reprog."+S.myId]:{fecha:$("#mrFecha").value,motivo:$("#mrMot").value.trim(),at:new Date().toISOString()}}),"Solicitud enviada a los tunos");return}
   if(f.id==="reprogForm"){const pid=S.sheet&&S.sheet.id;if(!pid)return;
     await safe(()=>S.db.doc("parches/"+pid).update({["solicitudesFecha."+S.myId]:{fecha:$("#rgFecha").value,hora:$("#rgHora").value,motivo:$("#rgMot").value.trim(),at:new Date().toISOString()}}),"Solicitud enviada a quien administra el parche");return}
   if(f.id==="localForm"){const pid=S.sheet&&S.sheet.id,nom=$("#lcNombre").value.trim();if(!pid||!nom)return;
@@ -1599,6 +1677,17 @@ document.addEventListener("click",async e=>{
   if(ds.cierre){const [k,id]=ds.cierre.split(":");openSheet({type:"cierreForm",kind:k,id});return}
   if(ds.aprobar){const [k,id]=ds.aprobar.split(":"),d={repartoAprobado:true,aprobadoPor:S.myId};
     await safe(()=>k==="parche"?privWrite(id,d):S.db.doc(KIND[k].col+"/"+id).update(d),"Reparto aprobado");return}
+  if(ds.mision){openSheet({type:"mision",id:ds.mision});return}
+  if(ds.misEdit){openSheet({type:"misionForm",id:ds.misEdit});return}
+  if(ds.misDel){const id=ds.misDel;openSheet({type:"confirm",title:"¿Eliminar la misión?",text:"Se borrará con el avance de todos los asignados.",yes:"Eliminar",run:()=>S.db.doc("misiones/"+id).delete()});return}
+  if(ds.misEstado){const [id,est]=ds.misEstado.split(":"),m=S.misiones.find(x=>x.id===id);if(!m)return;
+    await safe(()=>S.db.doc("misiones/"+id).update({["progreso."+S.myId]:{...progDe(m,S.myId),estado:est}}),"Listo");return}
+  if(ds.misVal){const [id,who,est]=ds.misVal.split(":"),m=S.misiones.find(x=>x.id===id);if(!m)return;
+    await safe(()=>S.db.doc("misiones/"+id).update({["progreso."+who]:{...progDe(m,who),estado:est,validadaPor:S.myId,validadaEn:new Date().toISOString()}}),est==="aprobada"?"Misión aprobada para "+nameOf(who):nameOf(who)+" deberá repetirla");return}
+  if(ds.misRp){const [id,who,r]=ds.misRp.split(":"),m=S.misiones.find(x=>x.id===id);if(!m)return;const x=(m.reprog||{})[who];if(!x)return;const FV=firebase.firestore.FieldValue;
+    const upd={["reprog."+who]:FV.delete()};if(r==="ok")upd["progreso."+who]={...progDe(m,who),fechaLimite:x.fecha};
+    await safe(()=>S.db.doc("misiones/"+id).update(upd),r==="ok"?"Nueva fecha para "+nameOf(who)+": "+fmtDate(x.fecha):"Solicitud rechazada");return}
+  if(ds.misReprogCancel){await safe(()=>S.db.doc("misiones/"+ds.misReprogCancel).update({["reprog."+S.myId]:firebase.firestore.FieldValue.delete()}),"Solicitud cancelada");return}
   if(ds.reprogOk||ds.reprogNo){const [pid,who]=(ds.reprogOk||ds.reprogNo).split(":"),p=S.parches.find(x=>x.id===pid);if(!p)return;const x=(p.solicitudesFecha||{})[who];if(!x)return;
     const upd={["solicitudesFecha."+who]:firebase.firestore.FieldValue.delete()};if(ds.reprogOk){upd.fecha=x.fecha;if(x.hora)upd.hora=x.hora}
     await safe(()=>S.db.doc("parches/"+pid).update(upd),ds.reprogOk?"Fecha cambiada a "+fmtDate(x.fecha):"Solicitud rechazada");return}
@@ -1658,7 +1747,7 @@ document.addEventListener("click",async e=>{
   if(ds.export){exportCsv(ds.export);return}
   if(ds.fest){S.filterEstado=ds.fest;render();return}
   if(ds.open){e.preventDefault();openSheet({type:"task",id:ds.open});return}
-  if(b.id==="fab"){openSheet({type:S.view==="eventos"?(S.evTab==="contratos"?"contratoForm":S.evTab==="presentaciones"?"presForm":"parcheForm"):S.view==="llamados"?"llamadoForm":"form"});return}
+  if(b.id==="fab"){if(S.view==="tareas"&&S.tareasTab==="mistica"){openSheet({type:"misionForm"});return}openSheet({type:S.view==="eventos"?(S.evTab==="contratos"?"contratoForm":S.evTab==="presentaciones"?"presForm":"parcheForm"):S.view==="llamados"?"llamadoForm":"form"});return}
   if(ds.edit){openSheet({type:"form",id:ds.edit});return}
   if(ds.split){openSheet({type:"form",padre:ds.split});return}
   if(ds.plazoReq){openSheet({type:"plazo",id:ds.plazoReq});return}
