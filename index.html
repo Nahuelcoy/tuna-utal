@@ -267,6 +267,12 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.locales{display:flex;flex-direction:column}
+.local{padding:10px 0;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}.local:last-child{border-bottom:0}
+.veces{display:flex;align-items:center;gap:2px;font-variant-numeric:tabular-nums}.veces .chip-x{font-size:18px;padding:0 8px;min-height:32px}
+.temas{display:flex;flex-wrap:wrap;gap:6px;padding-left:34px}
+.tema{display:inline-flex;align-items:center;gap:2px;background:var(--gold-soft);color:var(--gold-ink);border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600}
+.tema-sel{margin-left:34px;width:calc(100% - 34px)!important;min-height:38px!important;font-size:13px}
 .rep-row{display:flex;gap:10px;align-items:flex-end}
 .rep-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--gold-soft);color:var(--gold-ink);display:grid;place-items:center;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
 .rep-row .rep-n{margin-bottom:10px}
@@ -604,6 +610,7 @@ function membersChecks(sel,label){const ids=Object.keys(S.members).sort((a,b)=>n
 function parcheForm(o){const p=o.id?S.parches.find(x=>x.id===o.id):null;
   const v=p||{fecha:todayStr(),hora:"",lugar:"",conteo:{},otro:"",gastos:"",gastosDetalle:"",asistentes:[],notas:""};const ct=v.conteo||{};
   return `<h2>${p?"Editar parche":"Nuevo parche"}</h2><form class="f" id="parcheForm">
+  ${!p||canEditEv("parche",p)?`<div class="field"><label for="pAdmin">Administrador del parche</label><select class="input" id="pAdmin">${Object.keys(S.members).filter(id=>["tuno","pardillo"].includes(grado(id))||id===S.myId).sort((a,b)=>nameOf(a).localeCompare(nameOf(b))).map(id=>`<option value="${esc(id)}" ${(p?adminDeParche(p):S.myId)===id?"selected":""}>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</option>`).join("")}</select><span class="hint">Solo esta persona (y los administradores de la app) podrá editar el parche: locales, temas, veces por local, conteo y cierre.</span></div>`:""}
   <div class="field"><label for="pLugar">Zona o punto de encuentro</label><input type="text" id="pLugar" required maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Plaza de Armas de Talca"></div>
   <div class="two"><div class="field"><label for="pFechaP">Fecha</label><input type="date" id="pFechaP" required value="${esc(v.fecha)}"></div><div class="field"><label for="pHora">Hora</label><input type="time" id="pHora" value="${esc(v.hora)}"></div></div>
   <div class="field"><label>Conteo del dinero (cantidad de cada uno)</label><span class="hint">Déjalo en blanco al convocar; se completa después del parche.</span>
@@ -657,6 +664,13 @@ function etapaDe(kind,e){if(e.etapa)return e.etapa;
   if(kind==="parche")return (e.fecha>todayStr()||(e.fecha===todayStr()&&!parcheTotal(e)))?"confirmado":"cerrado";
   return "convocatoria"}
 const isOrg=()=>["tuno","pardillo"].includes(me()?.grado);
+// Un parche solo lo edita su administrador (o un administrador de la app).
+const adminDeParche=p=>p.adminParche||p.creadoPor;
+const canEditEv=(kind,e)=>kind==="parche"?(S.isOwner||adminDeParche(e)===S.myId):isOrg();
+// Temas efectivamente tocados: si el parche registra temas por local, se usan esos; si no, el repertorio.
+function tocadas(e){const L=(e.paradas||[]).filter(x=>(x.temas||[]).length);
+  if(L.length)return L.flatMap(x=>x.temas.map(id=>CANC[id]?{id,titulo:CANC[id].titulo,ritmo:CANC[id].ritmo}:null)).filter(Boolean);
+  return (e.repertorio||[]).filter(x=>x.id)}
 const vanIds=e=>e.convocados?Object.entries(e.convocados).filter(([,v])=>v&&v.r==="voy").map(([k])=>k):[...new Set(e.asistentes||[])];
 const noIds=e=>Object.entries(e.convocados||{}).filter(([,v])=>v&&v.r==="no").map(([k])=>k);
 const instDe=(e,id)=>((e.convocados||{})[id]||{}).inst||misInstr(id)[0]||"";
@@ -695,7 +709,7 @@ function evCard(kind,e){
 
 function convBlock(kind,e){const et=etapaDe(kind,e),abierto=["convocatoria","confirmado"].includes(et);
   const van=vanIds(e),no=noIds(e),sin=Object.keys(S.members).filter(id=>!van.includes(id)&&!no.includes(id));
-  const mine=(e.convocados||{})[S.myId],q=quorum(kind,e),org=isOrg()&&et!=="cerrado";
+  const mine=(e.convocados||{})[S.myId],q=quorum(kind,e),org=canEditEv(kind,e)&&et!=="cerrado";
   const chip=(id,quitar)=>`<span class="att-chip"><span class="dot g-${grado(id)||"x"}"></span>${esc(nameOf(id))}${instDe(e,id)?` <small>· ${esc(instName(instDe(e,id)))}</small>`:""}${quitar&&org?`<button class="chip-x" data-quitar="${kind}:${esc(e.id)}:${esc(id)}" aria-label="Quitar a ${esc(nameOf(id))}">✕</button>`:""}</span>`;
   let h=`<div class="block"><h4>${et==="convocatoria"?"Convocatoria":"Participantes"} · ${van.length} van</h4>
   <div class="quorum">${q.items.map(([l,n,m])=>`<span class="${n>=m?"ok":"no"}">${n>=m?"✓":"✗"} ${l} ${n}/${m}</span>`).join("")}</div>
@@ -709,7 +723,7 @@ function convBlock(kind,e){const et=etapaDe(kind,e),abierto=["convocatoria","con
     ${puede?"":`<p class="muted-p" style="margin-top:6px">Llevas menos de 2 meses como aspirante: un tuno o pardillo debe sumarte.</p>`}</div>`}
   h+=`<p class="rep-g">Van</p>${van.length?`<div class="att">${van.map(id=>chip(id,true)).join("")}</div>`:`<p class="muted-p">Nadie todavía.</p>`}`;
   if(no.length)h+=`<p class="rep-g">No pueden</p><div class="att">${no.map(id=>chip(id,false)).join("")}</div>`;
-  if(isOrg()&&abierto){
+  if(canEditEv(kind,e)&&abierto){
     h+=`<p class="rep-g">Sin responder · ${sin.length}</p>${sin.length?`<div class="att">${sin.map(id=>chip(id,false)).join("")}</div>`:`<p class="muted-p">Todos respondieron.</p>`}`;
     const cand=sin.concat(no);
     if(cand.length)h+=`<p class="rep-g">Sumar a alguien</p><div class="add-row"><select class="input" id="addMem" aria-label="Integrante a sumar">${cand.map(id=>`<option value="${esc(id)}">${esc(nameOf(id))}</option>`).join("")}</select>
@@ -717,7 +731,11 @@ function convBlock(kind,e){const et=etapaDe(kind,e),abierto=["convocatoria","con
       <button class="btn small" data-sumar="${kind}:${esc(e.id)}">Sumar</button></div>`}
   return h+`</div>`}
 
-function etapaActions(kind,e){if(!isOrg())return"";const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kind].nombre.toLowerCase();
+function etapaActions(kind,e){const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kind].nombre.toLowerCase();
+  if(!canEditEv(kind,e)){
+    if(isTuno()&&et==="cerrado"&&kind!=="presentacion"&&e.reparto&&!e.repartoAprobado)return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small gold" data-aprobar="${kind}:${id}">Aprobar reparto</button></div>`;
+    if(kind==="parche"&&isOrg())return `<div class="callout info">Este parche lo administra <b>${esc(nameOf(adminDeParche(e)))}</b>. Solo esa persona o un administrador de la app pueden editarlo.</div>`;
+    return ""}
   if(et==="convocatoria")return `<div class="block stage"><h4>Siguiente paso: confirmar</h4><p class="muted-p">Revisa el quórum, arma el repertorio y confirma ${kind==="presentacion"?"la presentación":"el "+nom}. Al confirmar se avisa a los participantes.</p>
     <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:confirmado">Confirmar ${nom}</button><button class="btn small danger" data-etapa="${kind}:${id}:cancelado">Cancelar</button></div></div>`;
   if(et==="confirmado")return `<div class="block stage"><h4>Siguiente paso: realizarlo</h4><p class="muted-p">${kind==="parche"?"Durante el parche, registra cada local donde tocaron. ":kind==="presentacion"?"Define canciones y representantes para los concursos. ":""}Al terminar, márcalo como realizado.</p>
@@ -728,9 +746,15 @@ function etapaActions(kind,e){if(!isOrg())return"";const et=etapaDe(kind,e),id=e
   if(et==="cancelado")return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small" data-etapa="${kind}:${id}:convocatoria">Reabrir convocatoria</button></div>`;
   return ""}
 
-function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")return"";const L=p.paradas||[],tot=sum(L,x=>x.veces||1),ed=isOrg()&&et!=="cerrado";
+function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")return"";const L=p.paradas||[],tot=sum(L,x=>x.veces||1),ed=canEditEv("parche",p)&&et!=="cerrado";
   let h=`<div class="block"><h4>Locales · ${L.length} ${L.length===1?"local":"locales"}, ${tot} ${tot===1?"pasada":"pasadas"}</h4>`;
-  h+=L.length?`<div class="rep-view">${L.map((x,i)=>`<div class="rep-item"><span class="rep-n">${i+1}</span><span class="rep-t">${esc(x.local)}${x.nota?`<br><small style="color:var(--muted)">${esc(x.nota)}</small>`:""}</span><span class="rep-r">${x.veces||1} ${(x.veces||1)==1?"vez":"veces"}</span>${ed?`<button class="chip-x" data-quitar-local="${esc(p.id)}:${i}" aria-label="Quitar local">✕</button>`:""}</div>`).join("")}</div>`
+  const repSongs=(p.repertorio||[]).filter(x=>x.id),pid=esc(p.id);
+  const temaSel=i=>`<select class="input tema-sel" data-add-tema="${pid}:${i}" aria-label="Agregar tema tocado en este local"><option value="">+ Agregar tema tocado…</option>${repSongs.length?`<optgroup label="Del repertorio">${repSongs.map(t=>`<option value="${t.id}">${esc(t.titulo)}</option>`).join("")}</optgroup>`:""}<optgroup label="Todo el cancionero">${CANCIONES.map(([id,t])=>`<option value="${id}">${esc(t)}</option>`).join("")}</optgroup></select>`;
+  h+=L.length?`<div class="locales">${L.map((x,i)=>`<div class="local"><div class="rep-item"><span class="rep-n">${i+1}</span><span class="rep-t"><b>${esc(x.local)}</b>${x.nota?`<br><small style="color:var(--muted)">${esc(x.nota)}</small>`:""}</span>
+      ${ed?`<span class="veces"><button class="chip-x" data-veces="${pid}:${i}:-1" aria-label="Una vez menos">−</button><b>${x.veces||1}</b><button class="chip-x" data-veces="${pid}:${i}:1" aria-label="Una vez más">+</button></span>`:`<span class="rep-r">${x.veces||1} ${(x.veces||1)==1?"vez":"veces"}</span>`}
+      ${ed?`<button class="chip-x" data-quitar-local="${pid}:${i}" aria-label="Quitar local">✕</button>`:""}</div>
+      <div class="temas">${(x.temas||[]).map((t,j)=>`<span class="tema">${esc((CANC[t]||{}).titulo||t)}${ed?`<button class="chip-x" data-quitar-tema="${pid}:${i}:${j}" aria-label="Quitar tema">✕</button>`:""}</span>`).join("")||(ed?"":`<small style="color:var(--muted)">Sin temas registrados</small>`)}</div>
+      ${ed?temaSel(i):""}</div>`).join("")}</div>`
     :`<p class="muted-p">Aún no se registran locales.</p>`;
   if(ed){const prev=[...new Set(S.parches.flatMap(x=>(x.paradas||[]).map(y=>y.local)))];
     h+=`<form class="add-local" id="localForm"><input type="text" id="lcNombre" list="localesPrev" required maxlength="60" placeholder="Restaurante o local" aria-label="Local">
@@ -741,7 +765,7 @@ function localesBlock(p){const et=etapaDe("parche",p);if(et==="convocatoria")ret
   return h+`</div>`}
 
 const CONCURSOS=[["solista","Mejor solista"],["capa","Baile de capa"],["pandero","Baile de pandero"]];
-function concursosBlock(e){const princ=(e.repertorio||[]).filter(s=>s.id&&s.grupo==="Show principal"),van=vanIds(e),c=e.concursos||{},ed=isOrg()&&etapaDe("presentacion",e)!=="cerrado";
+function concursosBlock(e){const princ=(e.repertorio||[]).filter(s=>s.id&&s.grupo==="Show principal"),van=vanIds(e),c=e.concursos||{},ed=canEditEv("presentacion",e)&&etapaDe("presentacion",e)!=="cerrado";
   return `<div class="block"><h4>Concursos y representantes</h4>${CONCURSOS.map(([k,l])=>{const x=c[k]||{};
     return ed?`<div class="conc-row"><b>${l}</b><div class="two"><select class="input" data-conc="${esc(e.id)}:${k}:cancion" aria-label="Canción para ${l}"><option value="">— Canción del show principal —</option>${princ.map(s=>`<option value="${s.id}" ${x.cancion===s.id?"selected":""}>${esc(s.titulo)}</option>`).join("")}</select>
       <select class="input" data-conc="${esc(e.id)}:${k}:rep" aria-label="Representante para ${l}"><option value="">— Representante —</option>${van.map(id=>`<option value="${esc(id)}" ${x.rep===id?"selected":""}>${esc(nameOf(id))}</option>`).join("")}</select></div></div>`
@@ -780,12 +804,13 @@ function eventoDetail(kind,e){const et=etapaDe(kind,e);markSeen(e);let info="";
   else if(kind==="contrato")info=`<dt>Tipo</dt><dd>${esc(e.tipo||"Otro")}</dd><dt>Pago</dt><dd><span class="pill ce-${esc(e.estado)}">${ESTADOS_CONTRATO[e.estado]||""}</span></dd>
     <dt>Fecha</dt><dd>${fmtDateDia(e.fecha)}${e.hora?", "+esc(e.hora):""}</dd>${e.lugar?`<dt>Lugar</dt><dd>${esc(e.lugar)}</dd>`:""}${e.contacto?`<dt>Contacto</dt><dd>${esc(e.contacto)}</dd>`:""}`;
   else info=`<dt>Fecha</dt><dd>${fmtDateDia(e.fecha)}${e.hora?", "+esc(e.hora):""}</dd>${e.lugar?`<dt>Lugar</dt><dd>${esc(e.lugar)}</dd>`:""}`;
-  info+=`<dt>Organiza</dt><dd>${esc(nameOf(e.creadoPor))}</dd>${e.confirmadoEn?`<dt>Confirmado</dt><dd>${fmtTs(e.confirmadoEn)}${e.confirmadoPor?" por "+esc(nameOf(e.confirmadoPor)):""}</dd>`:""}`;
+  info+=kind==="parche"?`<dt>Administra</dt><dd>${esc(nameOf(adminDeParche(e)))}</dd>`:`<dt>Organiza</dt><dd>${esc(nameOf(e.creadoPor))}</dd>`;
+  info+=`${e.confirmadoEn?`<dt>Confirmado</dt><dd>${fmtTs(e.confirmadoEn)}${e.confirmadoPor?" por "+esc(nameOf(e.confirmadoPor)):""}</dd>`:""}`;
   const ek=kind==="presentacion"?"pres":kind;
   return `<h2>${esc(KIND[kind].title(e))}</h2>${stepper(et)}
   <div class="block"><dl class="kv">${info}</dl>${e.notas?`<p class="desc" style="margin-top:10px">${esc(e.notas)}</p>`:""}</div>
   ${etapaActions(kind,e)}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+parcheMoney(e):""}${kind==="contrato"?contratoMoney(e):""}${cierreBlock(kind,e)}
-  ${isOrg()?`<div class="btn-row"><button class="btn" data-edit-${ek}="${esc(e.id)}">Editar datos</button>${isTuno()?`<button class="btn danger" data-del-${ek}="${esc(e.id)}">Eliminar</button>`:""}</div>`:""}`}
+  ${canEditEv(kind,e)?`<div class="btn-row"><button class="btn" data-edit-${ek}="${esc(e.id)}">Editar datos</button>${(kind==="parche"?canEditEv(kind,e):isTuno())?`<button class="btn danger" data-del-${ek}="${esc(e.id)}">Eliminar</button>`:""}</div>`:""}`}
 
 function viewPresentaciones(){
   if(!S.ready.pr)return loadingHtml;const A=S.presentaciones;
@@ -1062,7 +1087,7 @@ function llamadoForm(o){const l=o.id?S.llamados.find(x=>x.id===o.id):null;
 // ---------- repertorio ----------
 const evFor=(k,id)=>k==="parche"?S.parches.find(x=>x.id===id):k==="contrato"?S.contratos.find(x=>x.id===id):k==="presentacion"?S.presentaciones.find(x=>x.id===id):(S.llamados.find(x=>x.id===id)||S.presAll.find(x=>x.id===id));
 const evTitle=(k,e)=>k==="presentacion"?"Presentación · "+(e.titulo||"")+" · "+fmtDate(e.fecha):k==="parche"?"Parche · "+(e.lugar||"")+" · "+fmtDate(e.fecha):k==="contrato"?"Contrato · "+(e.cliente||"")+" · "+fmtDate(e.fecha):(TIPOS_LLAMADO[e.tipo]||"Llamado")+" · "+(e.titulo||"")+" · "+fmtDate(e.fecha);
-function playCounts(){const c={};[...S.parches,...S.contratos,...S.presAll,...S.presentaciones].forEach(e=>(e.repertorio||[]).forEach(s=>{if(s.id)c[s.id]=(c[s.id]||0)+1}));return c}
+function playCounts(){const c={};[...S.parches,...S.contratos,...S.presAll,...S.presentaciones].forEach(e=>tocadas(e).forEach(s=>{if(s.id)c[s.id]=(c[s.id]||0)+1}));return c}
 const repCountTxt=()=>S.repDraft.filter(s=>s.id).length+" de "+S.repDraft.length+" canciones elegidas";
 function repSlotsHtml(){let g=null,h="";
   S.repDraft.forEach((sl,i)=>{if(sl.grupo!==g){g=sl.grupo;h+=`<p class="group-label">${esc(g)}</p>`}
@@ -1085,11 +1110,11 @@ function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<d
   if(!r.length)h+=`<p class="muted-p">${isTuno()?"Aún no se arma el repertorio de este evento.":"El repertorio aún no está definido."}</p>`;
   else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
     h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`}
-  if(kind==="llamado"?isTuno():isOrg()&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
+  if(kind==="llamado"?isTuno():canEditEv(kind,ev)&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
   return h+`</div>`}
 function cancionesKpi(P,C,ini,hoy){
   const L=[...S.presAll,...S.presentaciones.filter(e=>["realizado","cerrado"].includes(etapaDe("presentacion",e)))].filter(l=>l.fecha>=ini&&l.fecha<=hoy),cnt={};
-  const add=(e,src)=>(e.repertorio||[]).forEach(s=>{if(!s.id)return;const c=cnt[s.id]=cnt[s.id]||{id:s.id,titulo:s.titulo,ritmo:s.ritmo||"Sin estilo",p:0,c:0,l:0};c[src]++});
+  const add=(e,src)=>tocadas(e).forEach(s=>{if(!s.id)return;const c=cnt[s.id]=cnt[s.id]||{id:s.id,titulo:s.titulo,ritmo:s.ritmo||"Sin estilo",p:0,c:0,l:0};c[src]++});
   P.forEach(e=>add(e,"p"));C.forEach(e=>add(e,"c"));L.forEach(e=>add(e,"l"));
   const rows=Object.values(cnt).map(r=>({...r,t:r.p+r.c+r.l})).sort((a,b)=>b.t-a.t||a.titulo.localeCompare(b.titulo));
   const evs=[...P,...C,...L],conRep=evs.filter(e=>(e.repertorio||[]).some(s=>s.id)).length;
@@ -1300,6 +1325,7 @@ document.addEventListener("submit",async e=>{
     const data={lugar:$("#pLugar").value.trim(),fecha:$("#pFechaP").value,hora:$("#pHora").value,conteo,otro:Math.round(+$("#pOtro").value||0),
       gastos:Math.max(0,Math.round(+$("#pGastos").value||0)),gastosDetalle:$("#pGastosDet").value.trim(),
       notas:$("#pNotas").value.trim()};
+    if($("#pAdmin"))data.adminParche=$("#pAdmin").value;
     data.total=parcheTotal(data);data.neto=data.total-data.gastos;
     if(o.id){await safe(()=>S.db.doc("parches/"+o.id).update({...data,actualizado:new Date().toISOString()}),"Parche guardado");openSheet({type:"parche",id:o.id})}
     else{const id=uid();await safe(()=>S.db.doc("parches/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Parche convocado");openSheet({type:"parche",id})}}
@@ -1365,6 +1391,9 @@ document.addEventListener("change",async e=>{
     const nt=$("#repCount");if(nt)nt.textContent=repCountTxt();return}
   if(el.id==="rPl"){$("#rParams").innerHTML=paramInputs(el.value,null);return}
   if(el.id==="addMem"){const i=misInstr(el.value)[0];if(i&&$("#addInst"))$("#addInst").value=i;return}
+  if(el.dataset.addTema&&el.value){const [id,i]=el.dataset.addTema.split(":"),p=S.parches.find(x=>x.id===id),t=el.value;if(!p)return;
+    const L2=(p.paradas||[]).map((x,k)=>k===+i?{...x,temas:[...(x.temas||[]).filter(y=>y!==t),t]}:x);
+    await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}),"Tema agregado: "+((CANC[t]||{}).titulo||""));return}
   if(el.dataset.conc){const [id,k,f]=el.dataset.conc.split(":");await safe(()=>S.db.doc("presentaciones/"+id).update({["concursos."+k+"."+f]:el.value}),"Guardado");return}
   if(el.dataset.grado){const id=el.dataset.grado;await safe(()=>S.db.doc("miembros/"+id).update({grado:el.value}),nameOf(id)+" ahora es "+GRADOS[el.value].toLowerCase())}
 });
@@ -1400,6 +1429,12 @@ document.addEventListener("click",async e=>{
   if(ds.wsp){const [k,id]=ds.wsp.split(":"),ev=KIND[k].arr().find(x=>x.id===id);if(!ev)return;window.open("https://wa.me/?text="+encodeURIComponent(wspText(k,ev)),"_blank");return}
   if(ds.cierre){const [k,id]=ds.cierre.split(":");openSheet({type:"cierreForm",kind:k,id});return}
   if(ds.aprobar){const [k,id]=ds.aprobar.split(":");await safe(()=>S.db.doc(KIND[k].col+"/"+id).update({repartoAprobado:true,aprobadoPor:S.myId}),"Reparto aprobado");return}
+  if(ds.veces){const [id,i,d]=ds.veces.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;
+    const L2=(p.paradas||[]).map((x,j)=>j===+i?{...x,veces:Math.max(1,Math.min(20,(x.veces||1)+(+d)))}:x);
+    await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}));return}
+  if(ds.quitarTema){const [id,i,j]=ds.quitarTema.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;
+    const L2=(p.paradas||[]).map((x,k)=>k===+i?{...x,temas:(x.temas||[]).filter((t,m)=>m!==+j)}:x);
+    await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}),"Tema quitado");return}
   if(ds.quitarLocal){const [id,i]=ds.quitarLocal.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;const L2=(p.paradas||[]).filter((x,j)=>j!==+i);
     await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}),"Local quitado");return}
   if(ds.repIgual!=null){const neto=+ds.repIgual||0,pct=Math.max(0,Math.min(100,+($("#fondoPct")||{}).value||0)),ins=[...document.querySelectorAll("[data-reparto]")];if(!ins.length)return;
