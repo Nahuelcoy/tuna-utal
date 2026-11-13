@@ -26,3 +26,27 @@ self.addEventListener("fetch", e => {
     }).catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
   );
 });
+
+// Notificaciones al celular: llegan aunque la app esté cerrada.
+self.addEventListener("push", e => {
+  let d = {};
+  try { const j = e.data ? e.data.json() : {}; d = j.data || j.notification || j; }
+  catch (_) { d = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Tuna UTAL", {
+    body: d.body || "Hay novedades en la app.",
+    icon: "icons/icon-192.png", badge: "icons/icon-192.png",
+    tag: d.tag || undefined, data: { abrir: d.abrir || "" }
+  }));
+});
+
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  const abrir = (e.notification.data && e.notification.data.abrir) || "";
+  const url = new URL(abrir ? "./?abrir=" + encodeURIComponent(abrir) : "./", self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
+    for (const c of cs) {
+      if (c.url.startsWith(self.registration.scope)) { if (abrir) c.postMessage({ abrir }); return c.focus(); }
+    }
+    return self.clients.openWindow(url);
+  }));
+});

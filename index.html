@@ -316,6 +316,12 @@ body.es-tuno header.top{border-bottom-color:var(--gold);box-shadow:0 2px 0 var(-
 .rep-item{display:flex;align-items:center;gap:10px;font-size:14px}
 .rep-t{flex:1;min-width:0;overflow-wrap:anywhere}
 .rep-r{font-size:12px;color:var(--muted);white-space:nowrap}
+.av-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.av-item{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer;min-height:44px}
+.av-item small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.av-t{flex:1;min-width:0;overflow-wrap:anywhere}
+.av-dot{flex:none;width:9px;height:9px;border-radius:50%;margin-top:6px;background:transparent}
+.av-item.nuevo{border-color:var(--gold)}.av-item.nuevo .av-dot{background:var(--bad)}.av-item.nuevo .av-t{font-weight:600}
 .subc-btn{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
 .subc-head{margin:-4px 0 14px;color:var(--muted);font-size:13px}
 .subc-song{border:1px solid var(--line);border-radius:12px;margin:0 0 8px;background:var(--card,transparent)}
@@ -341,6 +347,7 @@ body.es-tuno header.top{border-bottom-color:var(--gold);box-shadow:0 2px 0 var(-
     <img src="logo.png" alt="Escudo de la Tuna UTAL">
     <div class="brand"><h1>Tuna UTAL</h1><small>Planificador de tareas · Beta</small></div>
     <div class="me-chip" id="meChip"></div>
+    <button class="hdr-btn" id="hdrBell" hidden aria-label="Avisos"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span class="badge" id="bellBadge" hidden></span></button>
     <button class="hdr-btn" id="hdrPeople" data-nav="gente" hidden aria-label="Integrantes"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-6-5-6.5"/></svg><span class="badge" id="hdrBadge" hidden></span></button>
   </div>
 </header>
@@ -354,6 +361,7 @@ body.es-tuno header.top{border-bottom-color:var(--gold);box-shadow:0 2px 0 var(-
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script>
 (function(){
@@ -459,7 +467,7 @@ async function boot(){
   const fs=firebase.firestore();
   try{fs.settings({ignoreUndefinedProperties:true,merge:true})}catch(e){}
   try{await fs.enablePersistence({synchronizeTabs:true})}catch(e){}
-  S.db=fs;S.dl={save:saveFile};
+  S.raw=fs;S.db=envolverDb(fs);S.dl={save:saveFile};
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
@@ -480,7 +488,7 @@ function subscribeAll(fs){
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   unsubs.push(fs.collection("miembros").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.data();if(v&&(v.agrupacion||AGRUPACION)===AGRUPACION)m[d.id]=v});
     S.members=m;S.ready.m=true;
-    subTareas(fs);subLlamados(fs);subPrivado(fs);subMisiones(fs);
+    subTareas(fs);subLlamados(fs);subPrivado(fs);subMisiones(fs);if(me()){subAvisos(fs);registrarToken().catch(()=>{})}
     if(isTuno()&&!reqSub){reqSub=true;unsubs.push(fs.collection("solicitudes").onSnapshot(sn=>{S.requests=sn.docs.map(d=>({id:d.id,...d.data()}));loadProfiles();render()},()=>{}))}
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
 
@@ -534,7 +542,7 @@ const privWrite=(id,data)=>S.db.doc("parchesPriv/"+id).set(data,{merge:true});
 function migrarPriv(){if(!S.isOwner||!S.db)return;const FV=firebase.firestore.FieldValue;
   (S.parchesBase||[]).forEach(p=>{const ks=PRIV.filter(k=>p[k]!==undefined);if(!ks.length||migrados.has(p.id))return;migrados.add(p.id);
     const d={},del={};ks.forEach(k=>{d[k]=p[k];del[k]=FV.delete()});
-    privWrite(p.id,d).then(()=>S.db.doc("parches/"+p.id).update(del)).catch(()=>{})})}
+    S.raw.doc("parchesPriv/"+p.id).set(d,{merge:true}).then(()=>S.raw.doc("parches/"+p.id).update(del)).catch(()=>{})})}
 function subPrivado(fs){const t=isTuno()||S.isOwner,modo=t?"tuno":(me()?me().grado:null);if(!modo||modo===privModo)return;privModo=modo;
   privUnsubs.forEach(f=>{try{f()}catch(e){}});privUnsubs=[];
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
@@ -550,7 +558,7 @@ function subPrivado(fs){const t=isTuno()||S.isOwner,modo=t?"tuno":(me()?me().gra
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
 
 // ---------- render ----------
-function render(){
+function render(){if(S.pendAbrir&&!S.sheet)setTimeout(abrirPendiente,0);
   const app=$("#app");
   const m=me();
   $("#meChip").innerHTML=m?`<b>${esc(m.apodo||nameOf(S.myId))}</b><span class="grado g-${m.grado}">${GRADOS[m.grado]}</span>`:"";
@@ -570,7 +578,7 @@ function render(){
   document.body.classList.toggle("es-tuno",isTuno());
   renderSheet();
 }
-function hideChrome(){$("#nav").hidden=true;$("#fab").hidden=true;$("#hdrPeople").hidden=true}
+function hideChrome(){$("#nav").hidden=true;$("#fab").hidden=true;$("#hdrPeople").hidden=true;$("#hdrBell").hidden=true}
 function showChrome(){
   $("#nav").hidden=false;
   const fabOn=S.view==="tareas"?(S.tareasTab==="mistica"?isTuno():canCreate()):S.view==="eventos"?isOrg():S.view==="llamados"?!!me():false;
@@ -586,6 +594,7 @@ function showChrome(){
   const items=[["tareas","Tareas"],["llamados","Llamados"],["eventos","Eventos"],["kpi","Indicadores"]];
   const av=avisosPendientes(),pendL=S.llamados.filter(l=>llamadoAbierto(l)&&!miResp(l.id)).length+av.conv.length+av.conf.length;
   const reqBadge=canManage()&&S.requests.length?S.requests.length:0;
+  const hbl=$("#hdrBell"),nb=avNoLeidos(),bb=$("#bellBadge");hbl.hidden=false;bb.hidden=!nb;bb.textContent=nb>9?"9+":nb;hbl.setAttribute("aria-label",nb?`Avisos, ${nb} sin leer`:"Avisos");
   const hp=$("#hdrPeople");hp.hidden=false;hp.setAttribute("aria-pressed",S.view==="gente");const hb=$("#hdrBadge");hb.hidden=!reqBadge;hb.textContent=reqBadge;
   $("#navInner").innerHTML=items.map(([k,l])=>`<button data-nav="${k}" ${S.view===k?'aria-current="page"':""}>${ic[k]}${l}${k==="tareas"&&pend&&isTuno()?`<span class="badge">${pend}</span>`:""}${k==="llamados"&&pendL?`<span class="badge">${pendL}</span>`:""}</button>`).join("");
 }
@@ -1467,6 +1476,127 @@ function joinView(){
   <div class="field"><label>¿Qué instrumentos tocas?</label><div class="inst-grid">${Object.keys(INSTR).map(k=>`<label class="inst-op"><input type="checkbox" name="jinst" value="${k}"> ${esc(instName(k))}</label>`).join("")}</div></div>
   <button class="btn primary" type="submit">Solicitar ingreso</button></form>${logoutBtn()}</div>`}
 
+// ---------- avisos: a cada persona involucrada le llega un aviso cuando alguien cambia algo ----------
+// Todas las escrituras pasan por S.db; aquí se detectan y se agrupan (varias escrituras de una misma acción = un aviso).
+const AV_COLS={tareas:1,misiones:1,parches:1,parchesPriv:1,contratos:1,presentaciones:1,llamados:1,respuestas:1,sugerencias:1,notasParche:1};
+const AV_SISTEMA=new Set(["visibilidad","actualizado","audiencia","agrupacion"]);
+let avCola={},avTimer=null;
+function envolverDb(fs){
+  const wrapDoc=(path)=>{const ref=fs.doc(path),[col,id]=path.split("/");if(!AV_COLS[col]||path.split("/").length!==2)return ref;
+    const prevOf=()=>{const o=objDe(col,id);return o?JSON.parse(JSON.stringify(o)):null};
+    return {id:ref.id,path:ref.path,get:(...a)=>ref.get(...a),onSnapshot:(...a)=>ref.onSnapshot(...a),collection:(...a)=>ref.collection(...a),
+      update:async(d,...r)=>{const prev=prevOf();const x=await ref.update(d,...r);avEncolar(col,id,"editar",d,prev);return x},
+      set:async(d,o)=>{const prev=prevOf();const x=await ref.set(d,o);avEncolar(col,id,prev?"editar":"crear",d,prev);return x},
+      delete:async()=>{const prev=prevOf();const x=await ref.delete();avEncolar(col,id,"eliminar",{},prev);return x}}};
+  return {doc:wrapDoc,collection:(...a)=>fs.collection(...a),batch:()=>fs.batch(),raw:fs}}
+function objDe(col,id){const A={tareas:S.tasks,misiones:S.misiones,parches:S.parches,parchesPriv:S.parches,contratos:S.contratos,presentaciones:S.presentaciones,
+  llamados:S.llamados,respuestas:S.respuestas,sugerencias:S.sugerencias,notasParche:S.notasParche}[col]||[];return A.find(x=>x.id===id)||null}
+function avEncolar(col,id,accion,data,prev){
+  const keys=Object.keys(data||{}).map(k=>k.split(".")[0]);
+  if(accion==="editar"&&keys.length&&keys.every(k=>AV_SISTEMA.has(k)))return;
+  const k=(col==="parchesPriv"?"parches":col)+"/"+id,q=avCola[k]||(avCola[k]={col:col==="parchesPriv"?"parches":col,id,accion,keys:new Set(),data:{},prev,priv:false});
+  if(accion==="crear"||accion==="eliminar")q.accion=accion;
+  if(col==="parchesPriv")q.priv=true;else keys.forEach(x=>q.keys.add(x));
+  Object.assign(q.data,data||{});if(!q.prev)q.prev=prev;
+  clearTimeout(avTimer);avTimer=setTimeout(avVaciar,1200)}
+const yo=()=>nameOf(S.myId);
+const tunosDe=ids=>ids.filter(id=>grado(id)==="tuno");
+const porAud=a=>Object.keys(S.members).filter(id=>a==="tunos"?grado(id)==="tuno":a==="tunos_pardillos"?["tuno","pardillo"].includes(grado(id)):true);
+const ETAPA_TXT={convocatoria:"convocatoria",confirmado:"confirmado",realizado:"realizado",cerrado:"cerrado",cancelado:"cancelado"};
+const KCOL={parches:"parche",contratos:"contrato",presentaciones:"presentacion"};
+function organizadores(kind,e){return [e.creadoPor,kind==="parche"?adminDeParche(e):null].filter(Boolean)}
+function involucradosEv(kind,e){return [...vanIds(e),...(e.asistentes||[]),...organizadores(kind,e)]}
+// Arma destinatarios y texto según lo que cambió. Nunca incluye montos ni detalles privados en el texto.
+function avArmar(q){
+  const col=q.col,cur=objDe(col,q.id),nuevos=Object.fromEntries(Object.entries(q.data||{}).filter(([k,v])=>!k.includes(".")&&(v===null||["string","number","boolean"].includes(typeof v)))),
+    e=q.accion==="eliminar"?(q.prev||{}):{...(q.prev||{}),...(cur||{}),...(q.accion==="crear"?q.data:nuevos)},K=q.keys,has=k=>K.has(k);
+  let para=[],texto="",soloTunos=false,ref={kind:"",id:q.id};
+  if(col==="tareas"){const t=e,tt="«"+(t.titulo||"tarea")+"»";ref.kind="task";
+    para=[...(t.asignados||[]),t.creadoPor];soloTunos=t.visibilidad==="tunos";
+    if(q.accion==="crear")texto=`${yo()} te asignó la tarea ${tt}`;
+    else if(q.accion==="eliminar")texto=`${yo()} eliminó la tarea ${tt}`;
+    else if(has("estado")&&t.estado)texto=`${yo()} marcó ${tt} como ${({pendiente:"pendiente",en_curso:"en curso",realizada:"realizada"})[t.estado]||t.estado}`;
+    else if(has("solicitudPlazo"))texto=t.solicitudPlazo?`${yo()} pidió más plazo para ${tt}`:`${yo()} respondió la solicitud de plazo de ${tt}`;
+    else if(has("notas"))texto=`${yo()} agregó una nota en ${tt}`;
+    else if(has("asignados"))texto=`${yo()} cambió a quiénes está asignada ${tt}`;
+    else if(has("fechaLimite"))texto=`${yo()} cambió la fecha límite de ${tt}`;
+    else texto=`${yo()} editó la tarea ${tt}`}
+  else if(col==="misiones"){const m=e,tt="«"+(m.titulo||"misión")+"»";ref.kind="mision";para=[...(m.asignados||[]),m.creadoPor];
+    texto=q.accion==="crear"?`${yo()} te asignó la misión de mística ${tt}`:q.accion==="eliminar"?`${yo()} eliminó la misión ${tt}`:
+      has("reprog")?`${yo()} pidió reprogramar su parte de ${tt}`:has("progreso")?`${yo()} actualizó su avance en ${tt}`:`${yo()} editó la misión ${tt}`}
+  else if(KCOL[col]){const kind=KCOL[col],tt="«"+KIND[kind].title(e)+"»",nom=KIND[kind].nombre.toLowerCase(),art=kind==="presentacion"?"la":"el";ref.kind=kind;
+    if(q.accion==="crear"){para=Object.keys(S.members);texto=`${yo()} convocó a ${kind==="presentacion"?"una":"un"} ${nom}: ${tt}, ${fmtDateDia(e.fecha)}`}
+    else if(q.accion==="eliminar"){para=involucradosEv(kind,e);texto=`${yo()} eliminó ${art} ${nom} ${tt}`}
+    else if(q.priv&&!K.size){para=tunosDe(involucradosEv(kind,e));soloTunos=true;texto=`${yo()} actualizó la cuenta y bitácora del ${nom} ${tt}`}
+    else if([...K].every(k=>["convocados","asistentes"].includes(k))){const r=((e.convocados||{})[S.myId]||{}).r;para=organizadores(kind,e);
+      texto=`${yo()} ${r==="voy"?"confirmó que va":r==="no"?"avisó que no va":"respondió"} a ${art} ${nom} ${tt}`}
+    else if(has("solicitudesFecha")&&K.size===1){para=[...organizadores(kind,e),...tunosDe(involucradosEv(kind,e))];texto=`${yo()} pidió cambiar la fecha ${kind==="presentacion"?"de la":"del"} ${nom} ${tt}`}
+    else{para=involucradosEv(kind,e);
+      texto=has("etapa")?`${art==="la"?"La":"El"} ${nom} ${tt} pasó a ${ETAPA_TXT[e.etapa]||e.etapa}`:has("repertorio")?`${yo()} cambió el repertorio ${kind==="presentacion"?"de la":"del"} ${nom} ${tt}`:
+        has("paradas")?`${yo()} registró locales y temas del ${nom} ${tt}`:has("fecha")||has("hora")?`${yo()} cambió la fecha u hora ${kind==="presentacion"?"de la":"del"} ${nom} ${tt}`:`${yo()} editó ${art} ${nom} ${tt}`}}
+  else if(col==="llamados"){const l=e,tt="«"+(l.titulo||"llamado")+"»";ref.kind="llamado";soloTunos=audDe(l)==="tunos";para=porAud(audDe(l));
+    texto=q.accion==="crear"?`Nuevo llamado de ${yo()}: ${tt}${l.fecha?", "+fmtDateDia(l.fecha):""}`:q.accion==="eliminar"?`${yo()} canceló el llamado ${tt}`:`${yo()} editó el llamado ${tt}`}
+  else if(col==="respuestas"){const l=S.llamados.find(x=>x.id===(e.llamado||""));if(!l||q.accion==="eliminar")return null;ref={kind:"llamado",id:l.id};soloTunos=audDe(l)==="tunos";
+    para=[l.creadoPor];texto=`${yo()} respondió al llamado «${l.titulo||"llamado"}»`}
+  else if(col==="sugerencias"){if(q.accion!=="crear")return null;const ev=evFor(e.kind,e.evento);if(!ev)return null;ref={kind:e.kind,id:ev.id};
+    const t=tunosDe(involucradosEv(e.kind,ev));para=t.length?t:tunosDe(Object.keys(S.members));
+    texto=`${yo()} propuso canciones para ${e.kind==="presentacion"?"la presentación":"el "+KIND[e.kind].nombre.toLowerCase()} «${KIND[e.kind].title(ev)}»`}
+  else if(col==="notasParche"){if(q.accion!=="crear")return null;const p=S.parches.find(x=>x.id===e.parche);if(!p)return null;ref={kind:"parche",id:p.id};const tt="«"+KIND.parche.title(p)+"»";
+    if(e.tipo==="castigo"){para=(e.lectores||[]).filter(id=>grado(id)!=="tuno");texto=`Tienes una observación nueva en el parche ${tt}`}
+    else{para=tunosDe([...involucradosEv("parche",p),...(e.lectores||[])]);soloTunos=true;texto=`${yo()} dejó ${e.tipo==="apreciacion"?"una apreciación":"un comentario"} en el parche ${tt}`}}
+  else return null;
+  para=[...new Set(para.filter(id=>id&&id!==S.myId&&S.members[id]))];if(soloTunos)para=para.filter(id=>grado(id)==="tuno");
+  if(!para.length||!texto)return null;
+  return {para,texto,ref}}
+async function avVaciar(){const L=Object.values(avCola);avCola={};
+  for(const q of L){let a=null;try{a=avArmar(q)}catch(e){}if(!a)continue;
+    const id=uid();const doc={para:a.para,por:S.myId,texto:a.texto,kind:a.ref.kind,ref:a.ref.id,fecha:new Date().toISOString(),leidos:[],agrupacion:AGRUPACION};
+    try{await S.raw.doc("avisos/"+id).set(doc);avPush(id)}catch(e){}}}
+async function avPush(id){try{const u=firebase.auth().currentUser;if(!u||!/^https?:/.test(location.protocol))return;const t=await u.getIdToken();
+  await fetch("/api/notify",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+t},body:JSON.stringify({aviso:id})})}catch(e){}}
+// Bandeja de avisos (últimos 30 días)
+let avUnsub=null,avLimpio=false;
+function subAvisos(fs){if(avUnsub)return;const cut=new Date(Date.now()-30*864e5).toISOString();
+  avUnsub=fs.collection("avisos").where("para","array-contains",S.myId).onSnapshot(sn=>{
+    S.avisos=sn.docs.map(d=>({id:d.id,...d.data()})).filter(a=>(a.agrupacion||AGRUPACION)===AGRUPACION&&(a.fecha||"")>=cut).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+    render();if(S.sheet&&S.sheet.type==="avisos"){$("#layer").innerHTML="";renderSheet()}abrirPendiente()},()=>{});
+  unsubs.push(()=>{try{avUnsub()}catch(e){}avUnsub=null});
+  // limpieza: cada quien borra sus propios avisos de más de 30 días
+  if(!avLimpio){avLimpio=true;try{fs.collection("avisos").where("por","==",S.myId).get().then(sn=>sn.docs.forEach(d=>{if((d.data().fecha||"")<cut)d.ref.delete().catch(()=>{})})).catch(()=>{})}catch(e){}}}
+const avNoLeidos=()=>(S.avisos||[]).filter(a=>!(a.leidos||[]).includes(S.myId)).length;
+function avLeer(ids){const FV=firebase.firestore.FieldValue;ids.forEach(id=>S.raw.doc("avisos/"+id).update({leidos:FV.arrayUnion(S.myId)}).catch(()=>{}))}
+function avAbrir(kind,id){const map={task:["task",()=>S.tasks],mision:["mision",()=>S.misiones],parche:["parche",()=>S.parches],contrato:["contrato",()=>S.contratos],presentacion:["presentacion",()=>S.presentaciones],llamado:["llamado",()=>S.llamados]};
+  const m=map[kind];if(!m)return false;if(!m[1]().some(x=>x.id===id)){toast("Ya no está disponible.");return true}openSheet({type:m[0],id});return true}
+function abrirPendiente(){if(!S.pendAbrir)return;const [k,id]=S.pendAbrir.split(":");const m={task:S.tasks,mision:S.misiones,parche:S.parches,contrato:S.contratos,presentacion:S.presentaciones,llamado:S.llamados}[k];
+  if(m&&m.some(x=>x.id===id)){S.pendAbrir=null;openSheet({type:k,id})}}
+function pushEstado(){if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return "no";
+  if(!window.FIREBASE_VAPID||!firebase.messaging)return "sin-config";return Notification.permission}
+function avisosSheet(){const L=S.avisos||[],n=avNoLeidos(),st=pushEstado();
+  let h=`<h2>Avisos</h2>`;
+  const pushBox={granted:`<div class="callout info">🔔 Este celular recibe notificaciones.</div>`,
+    denied:`<div class="callout warn">Bloqueaste las notificaciones de la app. Para activarlas, permítelas en los ajustes del navegador o del celular.</div>`,
+    default:`<div class="callout info">Recibe estos avisos en el celular aunque la app esté cerrada. <button class="btn small gold" data-push-on>Activar notificaciones</button></div>`,
+    no:`<div class="callout info">Este navegador no permite notificaciones. En iPhone, primero agrega la app a la pantalla de inicio y ábrela desde ahí.</div>`,
+    "sin-config":`<div class="callout info">Las notificaciones al celular se activarán pronto. Mientras tanto, los avisos aparecen aquí.</div>`}[st]||"";
+  h+=pushBox;
+  if(!L.length)return h+`<div class="empty"><strong>Sin avisos</strong>Aquí verás cuando alguien cambie una tarea, parche, contrato, presentación o llamado en el que participas.</div>`;
+  if(n)h+=`<div class="btn-row" style="margin:8px 0 4px"><button class="btn small" data-av-todos>Marcar todo como leído</button></div>`;
+  h+=`<div class="av-list">${L.slice(0,60).map(a=>{const nuevo=!(a.leidos||[]).includes(S.myId);
+    return `<button class="av-item ${nuevo?"nuevo":""}" data-av="${esc(a.id)}"><span class="av-dot" aria-hidden="true"></span><span class="av-t">${esc(a.texto)}<small>${fmtTs(a.fecha)}</small></span></button>`}).join("")}</div>`;
+  return h}
+async function activarPush(){const st=pushEstado();
+  if(st==="no"){toast("Este navegador no permite notificaciones. En iPhone, instala la app en la pantalla de inicio.");return}
+  if(st==="sin-config"){toast("Las notificaciones al celular aún no están configuradas.");return}
+  try{const p=await Notification.requestPermission();if(p!=="granted"){toast("No se activaron las notificaciones.");$("#layer").innerHTML="";renderSheet();return}
+    await registrarToken();toast("Listo: este celular recibirá los avisos.")}catch(e){toast("No se pudo activar ("+(e.code||e.message||"error")+").")}
+  $("#layer").innerHTML="";renderSheet()}
+async function registrarToken(){if(pushEstado()!=="granted")return;const reg=await navigator.serviceWorker.ready;
+  const tok=await firebase.messaging().getToken({vapidKey:window.FIREBASE_VAPID,serviceWorkerRegistration:reg});if(!tok)return;
+  let prev=null;try{prev=localStorage.getItem("tuna_push_tok")}catch(e){}
+  if(prev===tok+":"+S.myId)return;
+  const FV=firebase.firestore.FieldValue;await S.raw.doc("pushTokens/"+S.myId).set({tokens:FV.arrayUnion(tok),actualizado:new Date().toISOString()},{merge:true});
+  try{localStorage.setItem("tuna_push_tok",tok+":"+S.myId)}catch(e){}}
+
 // ---------- hojas (detalle / formularios) ----------
 function renderSheet(){
   const L=$("#layer");if(!S.sheet){L.innerHTML="";return}
@@ -1485,6 +1615,7 @@ function renderSheet(){
   else if(S.sheet.type==="contrato"){const c=S.contratos.find(x=>x.id===S.sheet.id);if(!c){S.sheet=null;L.innerHTML="";return}inner=contratoDetail(c)}
   else if(S.sheet.type==="llamado"){const l=S.llamados.find(x=>x.id===S.sheet.id);if(!l){S.sheet=null;L.innerHTML="";return}inner=llamadoDetail(l)}
   else if(S.sheet.type==="llamadoForm")inner=llamadoForm(S.sheet);
+  else if(S.sheet.type==="avisos")inner=avisosSheet();
   else if(S.sheet.type==="subcanc"){const e=evFor(S.sheet.kind,S.sheet.id);if(!e||!subcVigente(S.sheet.kind,e)){S.sheet=null;L.innerHTML="";return}inner=subcSheet(S.sheet)}
   else if(S.sheet.type==="repForm"){if(!evFor(S.sheet.kind,S.sheet.id)){S.sheet=null;L.innerHTML="";return}inner=repForm(S.sheet)}
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
@@ -1776,6 +1907,10 @@ document.addEventListener("click",async e=>{
   if(ds.resp){const l=S.llamados.find(x=>x.id===(S.sheet&&S.sheet.id));if(!l)return;const mr=miResp(l.id);if(mr===ds.resp)return;
     if(ds.resp==="voy"&&!puedeSumarse(l.tipo)){toast("Un tuno debe sumarte.");return}
     await setResp(l,S.myId,ds.resp,ds.resp==="voy"?"Confirmaste que vas":"Avisaste que no puedes");return}
+  if(b.id==="hdrBell"){openSheet({type:"avisos"});return}
+  if("pushOn" in ds){activarPush();return}
+  if("avTodos" in ds){avLeer((S.avisos||[]).filter(a=>!(a.leidos||[]).includes(S.myId)).map(a=>a.id));return}
+  if(ds.av){const a=(S.avisos||[]).find(x=>x.id===ds.av);if(!a)return;if(!(a.leidos||[]).includes(S.myId))avLeer([a.id]);avAbrir(a.kind,a.ref);return}
   if(ds.subc){const [k,id]=ds.subc.split(":");abrirSubc(k,id);return}
   if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
   if(ds.repSug){const [k,id]=ds.repSug.split(":");openSheet({type:"repForm",kind:k,id,sug:true});return}
@@ -1849,6 +1984,9 @@ if("serviceWorker" in navigator&&location.protocol!=="file:"){
   navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!hadCtl||reloaded)return;reloaded=true;
     if(S.sheet){toast("Hay una versión nueva. Se aplicará al volver a abrir la app.")}else location.reload()});
 }
+// Al tocar una notificación se abre lo que cambió (?abrir=tipo:id o mensaje del service worker).
+try{const q=new URLSearchParams(location.search).get("abrir");if(q){S.pendAbrir=q;history.replaceState(null,"",location.pathname+location.hash)}}catch(e){}
+if("serviceWorker" in navigator)navigator.serviceWorker.addEventListener("message",ev=>{const d=ev.data||{};if(d.abrir){S.pendAbrir=d.abrir;abrirPendiente()}});
 boot();
 })();
 </script>
