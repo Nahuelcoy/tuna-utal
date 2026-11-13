@@ -267,6 +267,12 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.rep-person{padding:6px 0;border-bottom:1px solid var(--line)}.rep-person:last-child{border-bottom:0}
+.rep-p small{color:var(--muted);font-size:11.5px}
+.desc-d summary{cursor:pointer;font-size:12.5px;color:var(--bad);font-weight:600;padding:4px 0;list-style:none}.desc-d summary::-webkit-details-marker{display:none}
+.desc-d summary::before{content:"− "}
+.desc-row{display:grid;grid-template-columns:120px minmax(0,1fr);gap:6px;margin-top:4px}
+.desc-row input{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;min-height:40px}
 /* Vista de tuno: banda superior y sello en todo lo exclusivo */
 .vista-tuno{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:9px 12px;border-radius:12px;background:linear-gradient(90deg,var(--gold-soft),var(--surface));border:1px solid var(--gold);color:var(--ink)}
 .vista-tuno svg{width:24px;height:24px;flex:none;stroke:var(--gold-ink);fill:none;stroke-width:1.8}
@@ -496,7 +502,7 @@ function subLlamados(fs){const g=me()?.grado;if(!g||g===llamModo)return;llamModo
     S.presAll=[]}
   unsubs.push(()=>{llamUnsubs.forEach(f=>{try{f()}catch(e){}});llamUnsubs=[];llamModo=null})}
 // Plata, comentarios y bitácora del parche viven aparte ("parchesPriv"): solo los tunos los leen.
-const PRIV=["conteo","otro","gastos","gastosDetalle","total","neto","reparto","fondoTuna","fondoPct","bitacora","notas","repartoAprobado","aprobadoPor"];
+const PRIV=["conteo","otro","gastos","gastosDetalle","total","neto","reparto","repartoBruto","descuentos","descuentosTotal","fondoTuna","fondoPct","bitacora","notas","repartoAprobado","aprobadoPor"];
 let privModo=null,privUnsubs=[];const migrados=new Set();
 function mergeParches(){const pv=S.parchesPriv||{};S.parches=(S.parchesBase||[]).map(p=>{const x={...p};PRIV.forEach(k=>{if(!isTuno()&&!S.isOwner)delete x[k]});return Object.assign(x,pv[p.id]||{})})}
 const privWrite=(id,data)=>S.db.doc("parchesPriv/"+id).set(data,{merge:true});
@@ -708,8 +714,8 @@ function contratoForm(o){const c=o.id?S.contratos.find(x=>x.id===o.id):null;
   <div class="field"><label for="cNotas">Notas</label><textarea id="cNotas" maxlength="600">${esc(v.notas)}</textarea></div>
   <button class="btn primary" type="submit">${c?"Guardar cambios":"Registrar contrato"}</button></form>`}
 function updateLive(){
-  const cl=$("#cierreLive");if(cl){const neto=+cl.dataset.neto||0;let r=0;document.querySelectorAll("[data-reparto]").forEach(i=>r+=+i.value||0);const f=neto-r;
-    cl.innerHTML=`<span>Repartido <b>${clp(r)}</b></span><span>Fondo para la Tuna <b class="${f<0?"neg":""}">${clp(f)}</b></span>${cl.dataset.saldo!=null&&f>=0?`<span>La caja quedará en <b>${clp(+cl.dataset.saldo+f)}</b></span>`:""}${f<0?'<span class="neg">El reparto supera el neto</span>':""}`}
+  const cl=$("#cierreLive");if(cl){const neto=+cl.dataset.neto||0;let r=0,dt=0;document.querySelectorAll("[data-reparto]").forEach(i=>{const b=+i.value||0,d=Math.min(b,+(($("#ds_"+i.dataset.reparto)||{}).value)||0);r+=b-d;dt+=d});const f=neto-r;
+    cl.innerHTML=`<span>Repartido <b>${clp(r)}</b></span>${dt?`<span>Descuentos <b>${clp(dt)}</b></span>`:""}<span>Fondo para la Tuna <b class="${f<0?"neg":""}">${clp(f)}</b></span>${cl.dataset.saldo!=null&&f>=0?`<span>La caja quedará en <b>${clp(+cl.dataset.saldo+f)}</b></span>`:""}${f<0?'<span class="neg">El reparto supera el neto</span>':""}`}
   const pf=$("#parcheForm");if(pf&&$("#pLive")){let t=0;pf.querySelectorAll("[data-den]").forEach(i=>t+=(+i.value||0)*+i.dataset.den);t+=+$("#pOtro").value||0;
     const g=+$("#pGastos").value||0,e0=S.sheet&&S.sheet.id&&S.parches.find(x=>x.id===S.sheet.id),n=e0?att(e0):0;
     $("#pLive").innerHTML=`<span>Total <b>${clp(t)}</b></span><span>Neto <b>${clp(t-g)}</b></span><span>Por asistente <b>${n?clp((t-g)/n):"—"}</b></span>`}
@@ -846,9 +852,10 @@ function cierreBlock(kind,e){const b=e.bitacora,R=e.reparto;if(!b&&!R)return"";i
   if(b){if(b.altos)h+=`<p class="rep-g">Puntos altos</p><p class="desc">${esc(b.altos)}</p>`;if(b.mejorar)h+=`<p class="rep-g">A mejorar</p><p class="desc">${esc(b.mejorar)}</p>`;
     if(b.resultados)h+=`<p class="rep-g">Resultados</p><p class="desc">${esc(b.resultados)}</p>`}
   if(R&&kind!=="presentacion"&&isTuno()){const ent=Object.entries(R).filter(([,v])=>+v>0);
-    h+=`<p class="rep-g">Reparto ${e.repartoAprobado?'<span class="pill st-realizada">Aprobado</span>':'<span class="pill pl-pend">Por aprobar</span>'}</p>
-    <div class="tbl-wrap"><table class="money-tbl"><tbody>${ent.map(([id,v])=>`<tr><td>${esc(nameOf(id))}</td><td class="num">${clp(v)}</td></tr>`).join("")}
-    <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr>${isTuno()?`<tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr>`:""}</tbody></table></div>`}
+    h+=`<p class="rep-g">Reparto ${e.repartoAprobado?'<span class="pill st-realizada">Aprobado</span>':'<span class="pill pl-pend">Por aprobar</span>'}</p>`;
+    const D=e.descuentos||{},dids=Object.keys(D).filter(id=>!(id in R)),dt=sum(Object.values(D),x=>x.monto);
+    h+=`<div class="tbl-wrap"><table class="money-tbl"><tbody>${ent.concat(dids.map(id=>[id,0])).map(([id,v])=>`<tr><td>${esc(nameOf(id))}${D[id]?`<br><small class="neg">−${clp(D[id].monto)} descuento${D[id].motivo?": "+esc(D[id].motivo):""}</small>`:""}</td><td class="num">${clp(v)}</td></tr>`).join("")}
+    <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr>${dt?`<tr><td>Descuentos que quedan para la Tuna</td><td class="num">${clp(dt)}</td></tr>`:""}<tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr></tbody></table></div>`}
   return h+`</div>`}
 
 function parcheMoney(p){const tot=parcheTotal(p);if(!tot&&!+p.gastos)return"";const g=+p.gastos||0,neto=tot-g,n=att(p),ct=p.conteo||{};
@@ -913,7 +920,11 @@ function cierreForm(o){const k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e
   <div class="field"><label for="bMejorar">Errores o puntos a mejorar</label><textarea id="bMejorar" maxlength="800" placeholder="Ej: faltó afinar antes de entrar; demoramos entre locales">${esc(b.mejorar||"")}</textarea></div>
   ${k==="presentacion"?`<div class="field"><label for="bResult">Resultados o premios</label><textarea id="bResult" maxlength="400" placeholder="Ej: 2.º lugar mejor pandereta">${esc(b.resultados||"")}</textarea></div>`:
   `<div class="field"><label>Reparto: monto para cada integrante</label><span class="hint">Neto a repartir: <b>${clp(neto)}</b>. Lo que no se reparte queda para la Tuna.</span>
-    <div class="reparto">${van.length?van.map(id=>`<label class="rep-p" for="rp_${esc(id)}"><span>${esc(nameOf(id))}</span><input type="number" inputmode="numeric" min="0" step="100" id="rp_${esc(id)}" data-reparto="${esc(id)}" value="${+R[id]||""}" placeholder="0"></label>`).join(""):`<p class="muted-p">No hay participantes registrados.</p>`}</div></div>
+    <div class="reparto">${van.length?van.map(id=>{const B=(e.repartoBruto||{})[id]??R[id],D=(e.descuentos||{})[id]||{};
+      return `<div class="rep-person"><label class="rep-p" for="rp_${esc(id)}"><span>${esc(nameOf(id))} <small>${GRADOS[grado(id)]||""}</small></span><input type="number" inputmode="numeric" min="0" step="100" id="rp_${esc(id)}" data-reparto="${esc(id)}" value="${+B||""}" placeholder="0" aria-label="Monto asignado a ${esc(nameOf(id))}"></label>
+      <details class="desc-d" ${+D.monto?"open":""}><summary>Descuento${+D.monto?` · −${clp(D.monto)}`:""}</summary><div class="desc-row"><input type="number" inputmode="numeric" min="0" step="100" id="ds_${esc(id)}" data-descuento="${esc(id)}" value="${+D.monto||""}" placeholder="$ a descontar" aria-label="Descuento para ${esc(nameOf(id))}">
+        <input type="text" id="dm_${esc(id)}" data-desc-motivo="${esc(id)}" maxlength="80" value="${esc(D.motivo||"")}" placeholder="Motivo (ej: llegó tarde)" aria-label="Motivo del descuento"></div></details></div>`}).join(""):`<p class="muted-p">No hay participantes registrados.</p>`}</div>
+    <p class="chart-note">Cada descuento se resta de lo que recibe esa persona y queda para la Tuna.</p></div>
   ${van.length?`<div class="two"><div class="field"><label for="fondoPct">Dejar para la Tuna (%)</label><input type="number" id="fondoPct" inputmode="numeric" min="0" max="100" value="${e.fondoPct??20}"></div>
     <div class="field" style="justify-content:flex-end"><button type="button" class="btn small" data-rep-igual="${neto}">Repartir el resto en partes iguales</button></div></div>`:""}
   <div class="live-total" id="cierreLive" data-neto="${neto}" ${isTuno()?`data-saldo="${resumenCaja().saldo-(etapaDe(k,e)==="cerrado"?(+e.fondoTuna||0):0)}"`:""}></div>
@@ -965,14 +976,17 @@ function notasParcheBlock(p){const L=notasDe(p.id),pid=esc(p.id);
 const CAT_CAJA={ingreso:["Cuotas","Donación","Venta","Saldo inicial","Otro ingreso"],egreso:["Cuerdas e instrumentos","Vestuario","Viajes y certámenes","Transporte","Alimentación","Otro gasto"]};
 function movimientosCaja(){
   const ev=[...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e])].filter(([k,e])=>etapaDe(k,e)==="cerrado"&&e.reparto&&(+e.fondoTuna||0)!==0)
-    .map(([k,e])=>({id:"ev-"+e.id,fecha:e.fecha,tipo:"ingreso",monto:+e.fondoTuna||0,concepto:(k==="parche"?"Parche · ":"Contrato · ")+KIND[k].title(e),categoria:k==="parche"?"Fondo de parche":"Fondo de contrato",evento:[k,e.id],pendiente:!e.repartoAprobado}));
+    .flatMap(([k,e])=>{const dt=sum(Object.values(e.descuentos||{}),x=>x.monto),base=(+e.fondoTuna||0)-dt,tit=(k==="parche"?"Parche · ":"Contrato · ")+KIND[k].title(e),out=[];
+      if(base)out.push({id:"ev-"+e.id,fecha:e.fecha,tipo:"ingreso",monto:base,concepto:tit,categoria:k==="parche"?"Fondo de parche":"Fondo de contrato",evento:[k,e.id],pendiente:!e.repartoAprobado});
+      if(dt)out.push({id:"evd-"+e.id,fecha:e.fecha,tipo:"ingreso",monto:dt,concepto:"Descuentos · "+Object.entries(e.descuentos).map(([id,x])=>nameOf(id)+" "+clp(x.monto)).join(", "),categoria:"Descuentos de reparto · "+KIND[k].title(e),evento:[k,e.id],pendiente:!e.repartoAprobado});
+      return out});
   const man=S.caja.map(m=>({...m,monto:+m.monto||0,manual:true}));
   const all=[...ev,...man].sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")||(a.creado||"").localeCompare(b.creado||""));
   let saldo=0;all.forEach(m=>{saldo+=m.tipo==="egreso"?-m.monto:m.monto;m.saldo=saldo});return all}
 function resumenCaja(){const all=movimientosCaja(),saldo=all.length?all[all.length-1].saldo:0;
   const mes=todayStr().slice(0,7),delMes=all.filter(m=>(m.fecha||"").startsWith(mes));
   return {all,saldo,ingMes:sum(delMes.filter(m=>m.tipo!=="egreso"),m=>m.monto),egrMes:sum(delMes.filter(m=>m.tipo==="egreso"),m=>m.monto),
-    deEventos:sum(all.filter(m=>m.evento),m=>m.monto),pend:all.filter(m=>m.pendiente).length}}
+    deEventos:sum(all.filter(m=>m.evento),m=>m.monto),deDescuentos:sum(all.filter(m=>(m.categoria||"").startsWith("Descuentos")),m=>m.monto),pend:all.filter(m=>m.pendiente).length}}
 function cajaHero(){const r=resumenCaja();
   return `<button class="kpi hero caja-hero solo-t" data-caja><span>Caja de la Tuna · saldo actual</span><b class="${r.saldo<0?"neg":""}">${clp(r.saldo)}</b>
     <small>Este mes: +${clp(r.ingMes)} · −${clp(r.egrMes)}${r.pend?` · ${r.pend} reparto${r.pend===1?"":"s"} por aprobar`:""} · Ver movimientos ›</small></button>`}
@@ -983,7 +997,7 @@ function cajaSheet(){const r=resumenCaja(),all=r.all.slice().reverse();
   let chart="";if(meses.length>1){const vals=meses.map(k=>{const ult=r.all.filter(m=>(m.fecha||"").slice(0,7)<=k);return ult.length?ult[ult.length-1].saldo:0});
     chart=chartBlock("Saldo de la caja mes a mes",null,lineChart(meses.map(k=>MESES[+k.slice(5)-1]),[{name:"Saldo",color:"var(--gold)",values:vals}],fmtMoneyShort,i=>`${MESES_L[+meses[i].slice(5)-1]} ${meses[i].slice(0,4)}\nSaldo al cierre: ${clp(vals[i])}`),"Saldo acumulado al final de cada mes.")}
   return `<h2>Caja de la Tuna</h2>
-  <div class="kpis"><div class="kpi hero"><span>Saldo actual</span><b class="${r.saldo<0?"neg":""}">${clp(r.saldo)}</b><small>${clp(r.deEventos)} aportado por parches y contratos</small></div>
+  <div class="kpis"><div class="kpi hero"><span>Saldo actual</span><b class="${r.saldo<0?"neg":""}">${clp(r.saldo)}</b><small>${clp(r.deEventos)} aportado por parches y contratos${r.deDescuentos?`, de eso ${clp(r.deDescuentos)} por descuentos`:""}</small></div>
     <div class="kpi"><span>Ingresos del mes</span><b>${clp(r.ingMes)}</b></div><div class="kpi"><span>Gastos del mes</span><b>${clp(r.egrMes)}</b></div></div>
   ${r.pend?`<div class="callout warn">${r.pend} aporte${r.pend===1?"":"s"} viene${r.pend===1?"":"n"} de repartos que un tuno aún no aprueba. Ya se cuentan en el saldo.</div>`:""}
   ${chart}
@@ -1442,13 +1456,15 @@ document.addEventListener("submit",async e=>{
   if(f.id==="cierreForm"){const o=S.sheet,k=o.kind,e=KIND[k].arr().find(x=>x.id===o.id);if(!e)return;
     const upd={bitacora:{altos:$("#bAltos").value.trim(),mejorar:$("#bMejorar").value.trim()},etapa:"cerrado",cerradoEn:new Date().toISOString(),cerradoPor:S.myId};
     if(k==="presentacion")upd.bitacora.resultados=$("#bResult").value.trim();
-    else{const neto=k==="parche"?parcheNeto(e):contratoUtil(e),R={};document.querySelectorAll("[data-reparto]").forEach(i=>{const v=Math.max(0,Math.round(+i.value||0));if(v)R[i.dataset.reparto]=v});
-      const rep=sum(Object.values(R),v=>v);if(rep>neto){toast("El reparto supera el neto. Revisa los montos.");return}
-      Object.assign(upd,{reparto:R,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
+    else{const neto=k==="parche"?parcheNeto(e):contratoUtil(e),R={},RB={},DS={};
+      document.querySelectorAll("[data-reparto]").forEach(i=>{const id=i.dataset.reparto,b=Math.max(0,Math.round(+i.value||0)),d=Math.min(b,Math.max(0,Math.round(+(($("#ds_"+id)||{}).value)||0)));
+        if(b)RB[id]=b;if(b-d)R[id]=b-d;if(d)DS[id]={monto:d,motivo:(($("#dm_"+id)||{}).value||"").trim()}});
+      const rep=sum(Object.values(R),v=>v),dtot=sum(Object.values(DS),x=>x.monto);if(rep>neto){toast("El reparto supera el neto. Revisa los montos.");return}
+      Object.assign(upd,{reparto:R,repartoBruto:RB,descuentos:DS,descuentosTotal:dtot,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
       if(isTuno())upd.repartoAprobado=true;
       if(k==="contrato")upd.estado=$("#pagoOk")&&$("#pagoOk").checked?"pagado":"realizado"}
     if(k==="parche"){const base={etapa:upd.etapa,cerradoEn:upd.cerradoEn,cerradoPor:upd.cerradoPor},priv={};
-      ["bitacora","reparto","fondoTuna","fondoPct","repartoAprobado"].forEach(x=>{if(upd[x]!==undefined)priv[x]=upd[x]});priv.agrupacion=AGRUPACION;
+      ["bitacora","reparto","repartoBruto","descuentos","descuentosTotal","fondoTuna","fondoPct","repartoAprobado"].forEach(x=>{if(upd[x]!==undefined)priv[x]=upd[x]});priv.agrupacion=AGRUPACION;
       await safe(async()=>{await privWrite(o.id,priv);await S.db.doc("parches/"+o.id).update(base)},"Parche cerrado")}
     else await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");
     openSheet({type:k,id:o.id});return}
