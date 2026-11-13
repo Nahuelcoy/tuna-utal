@@ -316,6 +316,18 @@ body.es-tuno header.top{border-bottom-color:var(--gold);box-shadow:0 2px 0 var(-
 .rep-item{display:flex;align-items:center;gap:10px;font-size:14px}
 .rep-t{flex:1;min-width:0;overflow-wrap:anywhere}
 .rep-r{font-size:12px;color:var(--muted);white-space:nowrap}
+.subc-btn{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.subc-head{margin:-4px 0 14px;color:var(--muted);font-size:13px}
+.subc-song{border:1px solid var(--line);border-radius:12px;margin:0 0 8px;background:var(--card,transparent)}
+.subc-song>summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px;cursor:pointer;min-height:44px}
+.subc-song>summary::-webkit-details-marker{display:none}
+.subc-song[open]>summary{border-bottom:1px solid var(--line)}
+.subc-body{padding:10px 12px 12px}
+.subc-letra{margin:0;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.subc-letra .ch{color:var(--gold-ink);font-weight:700}
+.subc-letra .lb{color:var(--muted);font-weight:700}
+.subc-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.subc-foot a{font-size:13px}
 .person{flex-wrap:wrap;row-gap:8px}
 .person .info{flex:1 1 calc(100% - 120px)}
 .person select,.person .btn{flex:none}
@@ -1335,10 +1347,37 @@ function repFormInner(o){const ev=evFor(o.kind,o.id),rp=ev.repPlantilla||{},pl=P
     <div class="btn-row"><button type="button" class="btn small" data-rep-build>Aplicar estructura</button><button type="button" class="btn small gold" data-rep-sugerir>Sugerir canciones</button></div>
     <div id="repSlots">${repSlotsHtml()}</div>
     <button class="btn primary" type="submit">Guardar repertorio</button></form>`}
+// ---------- sub-cancionero ----------
+// Se arma desde el repertorio del evento y solo existe mientras el evento no ha pasado.
+// No se guarda nada: al pasar la fecha (o al marcarse realizado/cerrado) desaparece y queda solo el cancionero.
+const CANCIONERO_URL="https://nahuelcoy.github.io/cancionero-tuna-utal/";
+function subcVigente(kind,e){return ["presentacion","contrato","parche"].includes(kind)&&(e.repertorio||[]).some(x=>x.id)
+  &&!["realizado","cerrado","cancelado"].includes(etapaDe(kind,e))&&(e.fecha||"")>=todayStr()}
+let LETRAS=null,letrasP=null;
+function cargarLetras(){if(LETRAS)return Promise.resolve(LETRAS);
+  return letrasP||(letrasP=fetch("canciones.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{LETRAS=Object.fromEntries(d.map(x=>[x.id,x]));return LETRAS}).catch(e=>{letrasP=null;throw e}))}
+const ACORDE=/^\(?[A-G][#b]?(m|maj|min|dim|aug|sus|add|M)?\d*(\/[A-G][#b]?)?\)?$/;
+function letraHtml(t){return (t||"").split("\n").map(l=>{const w=l.trim().split(/\s+/).filter(Boolean);
+  if(w.length&&w.every(x=>ACORDE.test(x)))return `<span class="ch">${esc(l)}</span>`;
+  const m=l.match(/^(\s*[A-ZÁÉÍÓÚÑ ]{3,}:)(.*)$/);if(m)return `<span class="lb">${esc(m[1])}</span>${esc(m[2])}`;
+  return esc(l)}).join("\n")}
+function subcSheet(o){const e=evFor(o.kind,o.id);if(!e)return "";const r=(e.repertorio||[]).filter(x=>x.id);
+  let h=`<h2>Sub-cancionero</h2><p class="subc-head">${esc(KIND[o.kind].nombre+" · "+KIND[o.kind].title(e)+" · "+fmtDateDia(e.fecha))} · ${r.length} canciones. Se borra solo cuando pasa el evento; el cancionero completo no cambia.</p>`;
+  if(!LETRAS){h+=o.err?`<div class="callout warn">No se pudieron cargar las letras (¿sin conexión?). Puedes abrir cada canción en el cancionero.</div>`:`<p class="muted-p">Cargando letras…</p>`}
+  let g=null,n=0;
+  (e.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;const L=LETRAS&&LETRAS[s.id];
+    h+=`<details class="subc-song" id="subc-${esc(s.id)}-${n}"><summary><span class="rep-n">${n}</span><span class="rep-t"><b>${esc(s.titulo)}</b></span><span class="rep-r">${esc(s.ritmo||"")}</span></summary>
+      <div class="subc-body">${L?`<pre class="subc-letra">${letraHtml(L.x)}</pre>`:LETRAS?`<p class="muted-p">Esta canción no tiene letra en el cancionero.</p>`:""}
+      <div class="subc-foot"><a href="${CANCIONERO_URL}#s-${encodeURIComponent(s.id)}" target="_blank" rel="noopener">Abrir en el cancionero (acordes, audios y correcciones) ↗</a></div></div></details>`});
+  return h}
+function abrirSubc(kind,id){openSheet({type:"subcanc",kind,id});
+  cargarLetras().then(()=>{if(S.sheet&&S.sheet.type==="subcanc"){$("#layer").innerHTML="";renderSheet()}})
+    .catch(()=>{if(S.sheet&&S.sheet.type==="subcanc"){S.sheet.err=true;$("#layer").innerHTML="";renderSheet()}})}
 function repBlock(kind,ev){const r=(ev.repertorio||[]).filter(x=>x.id);let h=`<div class="block"><h4>Repertorio${r.length?" · "+r.length+" canciones":""}</h4>`;
   if(!r.length)h+=`<p class="muted-p">${isTuno()?"Aún no se arma el repertorio de este evento.":"El repertorio aún no está definido."}</p>`;
   else{let g=null,n=0;h+=`<div class="rep-view">`;(ev.repertorio||[]).forEach(s=>{if(!s.id)return;if(s.grupo!==g){g=s.grupo;h+=`<p class="rep-g">${esc(g)}</p>`}n++;
-    h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`}
+    h+=`<div class="rep-item"><span class="rep-n">${n}</span><span class="rep-t">${esc(s.titulo)}</span><span class="rep-r">${esc(s.ritmo)}</span></div>`});h+=`</div>`;
+    if(subcVigente(kind,ev))h+=`<div class="subc-btn"><button class="btn small gold" data-subc="${kind}:${esc(ev.id)}">📖 Abrir sub-cancionero</button></div>`}
   const puedeEd=kind==="llamado"?isTuno():canEditEv(kind,ev)&&etapaDe(kind,ev)!=="cerrado";
   if(puedeEd)h+=`<button class="btn small ${r.length?"":"gold"}" style="margin-top:12px" data-rep="${kind}:${esc(ev.id)}">${r.length?"Editar repertorio":"Armar repertorio"}</button>`;
   else if(kind!=="llamado"&&etapaDe(kind,ev)!=="cerrado")h+=`<button class="btn small" style="margin-top:12px" data-rep-sug="${kind}:${esc(ev.id)}">Sugerir repertorio</button>`;
@@ -1443,6 +1482,7 @@ function renderSheet(){
   else if(S.sheet.type==="contrato"){const c=S.contratos.find(x=>x.id===S.sheet.id);if(!c){S.sheet=null;L.innerHTML="";return}inner=contratoDetail(c)}
   else if(S.sheet.type==="llamado"){const l=S.llamados.find(x=>x.id===S.sheet.id);if(!l){S.sheet=null;L.innerHTML="";return}inner=llamadoDetail(l)}
   else if(S.sheet.type==="llamadoForm")inner=llamadoForm(S.sheet);
+  else if(S.sheet.type==="subcanc"){const e=evFor(S.sheet.kind,S.sheet.id);if(!e||!subcVigente(S.sheet.kind,e)){S.sheet=null;L.innerHTML="";return}inner=subcSheet(S.sheet)}
   else if(S.sheet.type==="repForm"){if(!evFor(S.sheet.kind,S.sheet.id)){S.sheet=null;L.innerHTML="";return}inner=repForm(S.sheet)}
   else if(S.sheet.type==="presentacion"){const e=S.presentaciones.find(x=>x.id===S.sheet.id);if(!e){S.sheet=null;L.innerHTML="";return}inner=eventoDetail("presentacion",e)}
   else if(S.sheet.type==="presForm")inner=presForm(S.sheet);
@@ -1733,6 +1773,7 @@ document.addEventListener("click",async e=>{
   if(ds.resp){const l=S.llamados.find(x=>x.id===(S.sheet&&S.sheet.id));if(!l)return;const mr=miResp(l.id);if(mr===ds.resp)return;
     if(ds.resp==="voy"&&!puedeSumarse(l.tipo)){toast("Un tuno debe sumarte.");return}
     await setResp(l,S.myId,ds.resp,ds.resp==="voy"?"Confirmaste que vas":"Avisaste que no puedes");return}
+  if(ds.subc){const [k,id]=ds.subc.split(":");abrirSubc(k,id);return}
   if(ds.rep){const [k,id]=ds.rep.split(":");openSheet({type:"repForm",kind:k,id});return}
   if(ds.repSug){const [k,id]=ds.repSug.split(":");openSheet({type:"repForm",kind:k,id,sug:true});return}
   if(ds.sugUsar){const x=S.sugerencias.find(y=>y.id===ds.sugUsar);if(!x)return;const col=KIND[x.kind].col;

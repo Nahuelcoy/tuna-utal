@@ -1,7 +1,7 @@
 // Service worker: permite instalar la app y abrirla sin conexión.
 // Siempre intenta la versión más nueva primero, así cada actualización llega sola.
 const CACHE = "tuna-utal-v1";
-const SHELL = ["./", "./index.html", "./logo.png", "./manifest.webmanifest", "./firebase-config.js",
+const SHELL = ["./", "./index.html", "./logo.png", "./manifest.webmanifest", "./firebase-config.js", "./canciones.json",
   "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", e => {
