@@ -383,7 +383,7 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],aportes:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
   filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false,mi:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
@@ -450,7 +450,7 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],sugerencias:[],repMenor:[],misiones:[],aportes:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
       ready:{m:!u,t:false,p:false,c:false,l:false,pr:false,mi:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
@@ -474,7 +474,7 @@ function subscribeAll(fs){
   unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parchesBase=mine(snap);mergeParches();S.ready.p=true;migrarPriv();render()},()=>{S.ready.p=true;render()}));
   unsubs.push(fs.collection("sugerencias").onSnapshot(snap=>{S.sugerencias=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("repartoMenor").onSnapshot(snap=>{S.repMenor=mine(snap);backfillRepMenor();render()},()=>{}));
-  unsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
+
   unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
   // llamados y respuestas: solo los últimos 90 días, para cuidar el límite gratuito de lecturas
@@ -521,11 +521,16 @@ function migrarPriv(){if(!S.isOwner||!S.db)return;const FV=firebase.firestore.Fi
   (S.parchesBase||[]).forEach(p=>{const ks=PRIV.filter(k=>p[k]!==undefined);if(!ks.length||migrados.has(p.id))return;migrados.add(p.id);
     const d={},del={};ks.forEach(k=>{d[k]=p[k];del[k]=FV.delete()});
     privWrite(p.id,d).then(()=>S.db.doc("parches/"+p.id).update(del)).catch(()=>{})})}
-function subPrivado(fs){const t=isTuno()||S.isOwner,modo=t?"tuno":(me()?"otro":null);if(!modo||modo===privModo)return;privModo=modo;
+function subPrivado(fs){const t=isTuno()||S.isOwner,modo=t?"tuno":(me()?me().grado:null);if(!modo||modo===privModo)return;privModo=modo;
   privUnsubs.forEach(f=>{try{f()}catch(e){}});privUnsubs=[];
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   if(t)privUnsubs.push(fs.collection("parchesPriv").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.parchesPriv=m;mergeParches();render()},()=>{}));
   else{S.parchesPriv={};mergeParches()}
+  // Caja: los tunos ven todo; los pardillos solo los ingresos (sin gastos ni saldo).
+  if(t)privUnsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
+  else if(modo==="pardillo")privUnsubs.push(fs.collection("caja").where("tipo","==","ingreso").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
+  else S.caja=[];
+  if(t||modo==="pardillo")privUnsubs.push(fs.collection("aportes").onSnapshot(snap=>{S.aportes=mine(snap);backfillRepMenor();render()},()=>{}));
   privUnsubs.push((t?fs.collection("notasParche"):fs.collection("notasParche").where("lectores","array-contains",S.myId)).onSnapshot(snap=>{S.notasParche=mine(snap);render()},()=>{}));
   unsubs.push(()=>{privUnsubs.forEach(f=>{try{f()}catch(e){}});privUnsubs=[];privModo=null})}
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
@@ -696,7 +701,7 @@ function membersChecks(sel,label){const ids=Object.keys(S.members).sort((a,b)=>n
 function parcheForm(o){const p=o.id?S.parches.find(x=>x.id===o.id):null;
   const v=p||{fecha:todayStr(),hora:"",lugar:"",conteo:{},otro:"",gastos:"",gastosDetalle:"",asistentes:[],notas:""};const ct=v.conteo||{};
   return `<h2>${p?"Editar parche":"Nuevo parche"}</h2><form class="f" id="parcheForm">
-  ${!p||canEditEv("parche",p)?`<div class="field"><label for="pAdmin">Administrador del parche</label><select class="input" id="pAdmin">${Object.keys(S.members).filter(id=>["tuno","pardillo"].includes(grado(id))||id===S.myId).sort((a,b)=>nameOf(a).localeCompare(nameOf(b))).map(id=>`<option value="${esc(id)}" ${(p?adminDeParche(p):S.myId)===id?"selected":""}>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</option>`).join("")}</select><span class="hint">Solo esta persona (y los administradores de la app) podrá editar el parche: locales, temas, veces por local, conteo y cierre.</span></div>`:""}
+  ${!p||canEditEv("parche",p)?`<div class="field"><label for="pAdmin">Administrador del parche</label><select class="input" id="pAdmin">${Object.keys(S.members).filter(id=>["tuno","pardillo"].includes(grado(id))||id===S.myId).sort((a,b)=>nameOf(a).localeCompare(nameOf(b))).map(id=>`<option value="${esc(id)}" ${(p?adminDeParche(p):S.myId)===id?"selected":""}>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</option>`).join("")}</select><span class="hint">Pueden editar el parche quien lo propone, esta persona, cualquier tuno y los administradores de la app. La plata la registra un tuno.</span></div>`:""}
   <div class="field"><label for="pLugar">Zona o punto de encuentro</label><input type="text" id="pLugar" required maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Plaza de Armas de Talca"></div>
   <div class="two"><div class="field"><label for="pFechaP">Fecha</label><input type="date" id="pFechaP" required value="${esc(v.fecha)}"></div><div class="field"><label for="pHora">Hora</label><input type="time" id="pHora" value="${esc(v.hora)}"></div></div>
   ${isTuno()||S.isOwner?`<div class="field"><label>Conteo del dinero (cantidad de cada uno) · 🔒 solo tunos</label><span class="hint">Déjalo en blanco al convocar; se completa después del parche.</span>
@@ -752,7 +757,7 @@ function etapaDe(kind,e){if(e.etapa)return e.etapa;
 const isOrg=()=>["tuno","pardillo"].includes(me()?.grado);
 // Un parche solo lo edita su administrador (o un administrador de la app).
 const adminDeParche=p=>p.adminParche||p.creadoPor;
-const canEditEv=(kind,e)=>kind==="parche"?(S.isOwner||adminDeParche(e)===S.myId):isOrg();
+const canEditEv=(kind,e)=>kind==="parche"?(S.isOwner||isTuno()||e.creadoPor===S.myId||adminDeParche(e)===S.myId):isOrg();
 // Temas efectivamente tocados: si el parche registra temas por local, se usan esos; si no, el repertorio.
 function tocadas(e){const L=(e.paradas||[]).filter(x=>(x.temas||[]).length);
   if(L.length)return L.flatMap(x=>x.temas.map(id=>CANC[id]?{id,titulo:CANC[id].titulo,ritmo:CANC[id].ritmo}:null)).filter(Boolean);
@@ -820,7 +825,7 @@ function convBlock(kind,e){const et=etapaDe(kind,e),abierto=["convocatoria","con
 function etapaActions(kind,e){const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kind].nombre.toLowerCase();
   if(!canEditEv(kind,e)){
     if(isTuno()&&et==="cerrado"&&kind!=="presentacion"&&e.reparto&&!e.repartoAprobado)return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small gold" data-aprobar="${kind}:${id}">Aprobar reparto</button></div>`;
-    if(kind==="parche"&&isOrg())return `<div class="callout info">Este parche lo administra <b>${esc(nameOf(adminDeParche(e)))}</b>. Solo esa persona o un administrador de la app pueden editarlo.</div>`;
+    if(kind==="parche"&&isOrg())return `<div class="callout info">Este parche lo propuso <b>${esc(nameOf(e.creadoPor))}</b>${adminDeParche(e)!==e.creadoPor?` y lo administra <b>${esc(nameOf(adminDeParche(e)))}</b>`:""}. Solo ellos, un tuno o un administrador pueden editarlo.</div>`;
     return ""}
   if(et==="convocatoria")return `<div class="block stage"><h4>Siguiente paso: confirmar</h4><p class="muted-p">Revisa el quórum, arma el repertorio y confirma ${kind==="presentacion"?"la presentación":"el "+nom}. Al confirmar se avisa a los participantes.</p>
     <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:confirmado">Confirmar ${nom}</button><button class="btn small danger" data-etapa="${kind}:${id}:cancelado">Cancelar</button></div></div>`;
@@ -1062,10 +1067,26 @@ function notasParcheBlock(p){const L=notasDe(p.id),pid=esc(p.id);
 function repMenorDoc(kind,e,R,D){const m={};Object.keys({...R,...D}).forEach(id=>{if(grado(id)&&grado(id)!=="tuno")m[id]={monto:+R[id]||0,descuento:+(D[id]||{}).monto||0,motivo:(D[id]||{}).motivo||""}});
   return {kind,evento:e.id,fecha:e.fecha,titulo:KIND[kind].title(e),montos:m,agrupacion:AGRUPACION}}
 const repMenorBack=new Set();
-function backfillRepMenor(){if(!(isTuno()||S.isOwner)||!S.db)return;const ya=new Set(S.repMenor.map(x=>x.id));
+function backfillRepMenor(){if(!(isTuno()||S.isOwner)||!S.db)return;backfillAportes();const ya=new Set(S.repMenor.map(x=>x.id));
   [...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e])].forEach(([k,e])=>{const id=k+"_"+e.id;
     if(etapaDe(k,e)!=="cerrado"||!e.reparto||ya.has(id)||repMenorBack.has(id))return;repMenorBack.add(id);
     S.db.doc("repartoMenor/"+id).set(repMenorDoc(k,e,e.reparto||{},e.descuentos||{})).catch(()=>{})})}
+// Lo que cada evento cerrado dejó para la Tuna (lo ven tunos y pardillos).
+const aporteDoc=(k,e,fondo,desc)=>({kind:k,evento:e.id,fecha:e.fecha,titulo:KIND[k].title(e),fondo:(+fondo||0)-(+desc||0),descuentos:+desc||0,agrupacion:AGRUPACION});
+const aporteBack=new Set();
+function backfillAportes(){if(!(isTuno()||S.isOwner)||!S.db)return;const ya=new Set(S.aportes.map(x=>x.id));
+  [...S.parches.map(e=>["parche",e]),...S.contratos.map(e=>["contrato",e])].forEach(([k,e])=>{const id=k+"_"+e.id;
+    if(etapaDe(k,e)!=="cerrado"||!e.reparto||ya.has(id)||aporteBack.has(id))return;aporteBack.add(id);
+    S.db.doc("aportes/"+id).set(aporteDoc(k,e,e.fondoTuna,sum(Object.values(e.descuentos||{}),x=>x.monto))).catch(()=>{})})}
+function ingresosKpi(ini,hoy){if(me()?.grado!=="pardillo")return"";
+  const ev=S.aportes.flatMap(a=>{const o=[];if(+a.fondo)o.push({fecha:a.fecha,monto:+a.fondo,concepto:(a.kind==="parche"?"Parche · ":"Contrato · ")+a.titulo,cat:"Fondo del evento"});
+    if(+a.descuentos)o.push({fecha:a.fecha,monto:+a.descuentos,concepto:"Descuentos · "+a.titulo,cat:"Descuentos de reparto"});return o});
+  const man=S.caja.filter(m=>m.tipo==="ingreso").map(m=>({fecha:m.fecha,monto:+m.monto||0,concepto:m.concepto||m.categoria,cat:m.categoria}));
+  const all=[...ev,...man].sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")),per=all.filter(m=>(m.fecha||"")>=ini&&(m.fecha||"")<=hoy);
+  if(!all.length)return"";
+  return `<div class="block"><h4>Ingresos de la Tuna</h4><div class="kpis" style="margin-bottom:10px"><div class="kpi"><span>En el período</span><b>${clp(sum(per,m=>m.monto))}</b><small>${per.length} ingresos</small></div><div class="kpi"><span>Desde el inicio</span><b>${clp(sum(all,m=>m.monto))}</b><small>aportes, descuentos y cuotas</small></div></div>
+    <div class="caja-list">${per.slice(0,15).map(m=>`<div class="caja-mov"><div class="cm-main"><b>${esc(m.concepto||"Ingreso")}</b><small>${fmtDate(m.fecha)} · ${esc(m.cat||"")}</small></div><div class="cm-num"><b class="pos">+${clp(m.monto)}</b></div></div>`).join("")||'<p class="muted-p">Sin ingresos en este período.</p>'}</div>
+    <p class="chart-note">Lo ven tunos y pardillos. El saldo y los gastos de la caja son solo para tunos.</p></div>`}
 function montosMenoresKpi(ini,hoy){const L=S.repMenor.filter(x=>(x.fecha||"")>=ini&&(x.fecha||"")<=hoy);if(!L.length)return"";const per={},desc=[];
   L.forEach(x=>Object.entries(x.montos||{}).forEach(([id,v])=>{const o=per[id]=per[id]||{id,m:0,d:0,n:0};o.m+=+v.monto||0;o.d+=+v.descuento||0;o.n++;if(+v.descuento)desc.push({id,v,x})}));
   const rows=Object.values(per).sort((a,b)=>b.m-a.m);if(!rows.length)return"";
@@ -1162,7 +1183,7 @@ function viewKpi(){
   const P=S.parches.filter(p=>p.fecha>=ini&&p.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("parche",p)));
   const C=S.contratos.filter(c=>c.fecha>=ini&&c.fecha<=hoy&&(c.estado==="realizado"||c.estado==="pagado"));
   const tk=tareasKpi(ini,hoy),ck=cancionesKpi(P,C,ini,hoy);
-  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+montosMenoresKpi(ini,hoy)+tk+misticaKpi(ini,hoy)+exportBlock();
+  if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+ingresosKpi(ini,hoy)+montosMenoresKpi(ini,hoy)+tk+misticaKpi(ini,hoy)+exportBlock();
   const netoP=sum(P,parcheNeto),cobr=sum(C,c=>c.monto),cost=sum(C,costosTotal),utilC=cobr-cost,attP=sum(P,att),attC=sum(C,att),nEv=P.length+C.length;
   const mids=Object.keys(S.members),uniq=new Set([...P,...C].flatMap(e=>e.asistentes||[]).filter(id=>S.members[id]));
   const PR=S.presentaciones.filter(e=>e.fecha>=ini&&e.fecha<=hoy&&["realizado","cerrado"].includes(etapaDe("presentacion",e)));
@@ -1190,7 +1211,7 @@ function viewKpi(){
   if(P.length&&isTuno()){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
     h+=chartBlock("Recaudación por parche"+(P.length>12?" · últimos 12":""),null,barsChart(lp.map(p=>+p.fecha.slice(8)+"/"+(+p.fecha.slice(5,7))),[s],fmtMoneyShort,
       i=>{const p=lp[i],n=att(p);return `${p.lugar||"Parche"} · ${fmtDate(p.fecha)}\nNeto: ${clp(parcheNeto(p))}\n${n} asistente${n===1?"":"s"}${n?" · "+clp(parcheNeto(p)/n)+" c/u":""}`}),"Monto neto de cada parche, en orden de fecha.","solo-t")}
-  h+=ck+montosMenoresKpi(ini,hoy)+fondoKpi(P,C);
+  h+=ck+ingresosKpi(ini,hoy)+montosMenoresKpi(ini,hoy)+fondoKpi(P,C);
   const rows=mids.map(id=>({id,p:P.filter(e=>(e.asistentes||[]).includes(id)).length,c:C.filter(e=>(e.asistentes||[]).includes(id)).length}))
     .sort((a,b)=>(b.p+b.c)-(a.p+a.c)||nameOf(a.id).localeCompare(nameOf(b.id)));
   const act=rows.filter(r=>r.p+r.c),zero=rows.filter(r=>!(r.p+r.c)),mxr=Math.max(1,...act.map(r=>r.p+r.c));
@@ -1580,7 +1601,8 @@ document.addEventListener("submit",async e=>{
       Object.assign(upd,{reparto:R,repartoBruto:RB,descuentos:DS,descuentosTotal:dtot,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
       if(isTuno())upd.repartoAprobado=true;
       if(k==="contrato")upd.estado=$("#pagoOk")&&$("#pagoOk").checked?"pagado":"realizado"}
-    if(k!=="presentacion"&&upd.reparto)S.db.doc("repartoMenor/"+k+"_"+o.id).set(repMenorDoc(k,e,upd.reparto,upd.descuentos||{})).catch(()=>{});
+    if(k!=="presentacion"&&upd.reparto){S.db.doc("repartoMenor/"+k+"_"+o.id).set(repMenorDoc(k,e,upd.reparto,upd.descuentos||{})).catch(()=>{});
+      S.db.doc("aportes/"+k+"_"+o.id).set(aporteDoc(k,e,upd.fondoTuna,upd.descuentosTotal||0)).catch(()=>{})}
     if(k==="parche"){const base={etapa:upd.etapa,cerradoEn:upd.cerradoEn,cerradoPor:upd.cerradoPor},priv={};
       ["bitacora","reparto","repartoBruto","descuentos","descuentosTotal","fondoTuna","fondoPct","repartoAprobado"].forEach(x=>{if(upd[x]!==undefined)priv[x]=upd[x]});priv.agrupacion=AGRUPACION;
       await safe(async()=>{await privWrite(o.id,priv);await S.db.doc("parches/"+o.id).update(base)},"Parche cerrado")}
