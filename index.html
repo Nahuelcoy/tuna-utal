@@ -267,6 +267,9 @@ table.kt .num{text-align:right}
 .cm-main{flex:1;min-width:0;display:flex;flex-direction:column}.cm-main b{font-weight:600;font-size:14px;overflow-wrap:anywhere}.cm-main small{color:var(--muted);font-size:12px}
 .cm-num{display:flex;flex-direction:column;align-items:flex-end;font-variant-numeric:tabular-nums}.cm-num small{color:var(--muted);font-size:11.5px}
 .pos{color:var(--ok)}
+.nota-p{border-left:3px solid var(--line);padding:6px 0 6px 10px;margin-bottom:8px}.nota-p .who{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.nota-p p{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}.nota-p.apreciacion{border-color:var(--info)}.nota-p.castigo{border-color:var(--bad)}.nota-p.comentario{border-color:var(--gold)}
+.nota-form{margin-top:8px}.castigo-b{border-color:var(--bad);background:var(--bad-soft)}
 .solo-tunos{color:var(--gold-ink);font-weight:600}
 .aud-tunos{background:var(--gold);color:#2b1a00}.aud-tunos_pardillos{background:var(--wine-soft);color:var(--wine-ink)}
 .locales{display:flex;flex-direction:column}
@@ -353,7 +356,7 @@ const costosTotal = c=>sum(c.costos||[],x=>x.monto);
 const contratoUtil = c=>(+c.monto||0)-costosTotal(c);
 
 const S = {db:null,user:null,myId:null,isOwner:false,members:{},tasks:[],requests:[],profiles:{},
-  parches:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
+  parches:[],parchesBase:[],parchesPriv:{},notasParche:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],dl:null,view:"tareas",evTab:"parches",tareasTab:"mias",kpiPeriodo:"6m",
   filterEstado:"activas",filterCat:"",filterPersona:"",sheet:null,ready:{m:false,t:false,p:false,c:false,l:false,pr:false},error:null,myRequest:null};
 
 const $ = s=>document.querySelector(s);
@@ -420,7 +423,7 @@ async function boot(){
   firebase.auth().getRedirectResult().catch(e=>{S.loginError="No se pudo iniciar sesión ("+(e.code||"error")+").";render()});
   firebase.auth().onAuthStateChanged(async u=>{
     unsubAll();
-    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
+    Object.assign(S,{authChecked:true,authUser:u||null,myId:u?u.uid:null,members:{},tasks:[],parches:[],parchesBase:[],parchesPriv:{},notasParche:[],contratos:[],presentaciones:[],caja:[],llamados:[],respuestas:[],presAll:[],requests:[],myRequest:null,isOwner:false,sheet:null,
       ready:{m:!u,t:false,p:false,c:false,l:false,pr:false}});
     $("#layer").innerHTML="";render();
     if(!u)return;
@@ -437,11 +440,11 @@ function subscribeAll(fs){
   const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
   unsubs.push(fs.collection("miembros").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>{const v=d.data();if(v&&(v.agrupacion||AGRUPACION)===AGRUPACION)m[d.id]=v});
     S.members=m;S.ready.m=true;
-    subTareas(fs);subLlamados(fs);
+    subTareas(fs);subLlamados(fs);subPrivado(fs);
     if(isTuno()&&!reqSub){reqSub=true;unsubs.push(fs.collection("solicitudes").onSnapshot(sn=>{S.requests=sn.docs.map(d=>({id:d.id,...d.data()}));loadProfiles();render()},()=>{}))}
     render()},e=>{S.error="No se pudo leer la lista de integrantes ("+e.code+").";render()}));
 
-  unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parches=mine(snap);S.ready.p=true;render()},()=>{S.ready.p=true;render()}));
+  unsubs.push(fs.collection("parches").onSnapshot(snap=>{S.parchesBase=mine(snap);mergeParches();S.ready.p=true;migrarPriv();render()},()=>{S.ready.p=true;render()}));
   unsubs.push(fs.collection("caja").onSnapshot(snap=>{S.caja=mine(snap);render()},()=>{}));
   unsubs.push(fs.collection("presentaciones").onSnapshot(snap=>{S.presentaciones=mine(snap);S.ready.pr=true;render()},()=>{S.ready.pr=true;render()}));
   unsubs.push(fs.collection("contratos").onSnapshot(snap=>{S.contratos=mine(snap);S.ready.c=true;render()},()=>{S.ready.c=true;render()}));
@@ -480,6 +483,22 @@ function subLlamados(fs){const g=me()?.grado;if(!g||g===llamModo)return;llamModo
     llamUnsubs.push(fs.collection("respuestas").where("audiencia","in",a).onSnapshot(snap=>{S.respuestas=mine(snap).filter(r=>(r.fechaLlamado||"")>=cut);render()},()=>{}));
     S.presAll=[]}
   unsubs.push(()=>{llamUnsubs.forEach(f=>{try{f()}catch(e){}});llamUnsubs=[];llamModo=null})}
+// Plata, comentarios y bitácora del parche viven aparte ("parchesPriv"): solo los tunos los leen.
+const PRIV=["conteo","otro","gastos","gastosDetalle","total","neto","reparto","fondoTuna","fondoPct","bitacora","notas","repartoAprobado","aprobadoPor"];
+let privModo=null,privUnsubs=[];const migrados=new Set();
+function mergeParches(){const pv=S.parchesPriv||{};S.parches=(S.parchesBase||[]).map(p=>{const x={...p};PRIV.forEach(k=>{if(!isTuno()&&!S.isOwner)delete x[k]});return Object.assign(x,pv[p.id]||{})})}
+const privWrite=(id,data)=>S.db.doc("parchesPriv/"+id).set(data,{merge:true});
+function migrarPriv(){if(!S.isOwner||!S.db)return;const FV=firebase.firestore.FieldValue;
+  (S.parchesBase||[]).forEach(p=>{const ks=PRIV.filter(k=>p[k]!==undefined);if(!ks.length||migrados.has(p.id))return;migrados.add(p.id);
+    const d={},del={};ks.forEach(k=>{d[k]=p[k];del[k]=FV.delete()});
+    privWrite(p.id,d).then(()=>S.db.doc("parches/"+p.id).update(del)).catch(()=>{})})}
+function subPrivado(fs){const t=isTuno()||S.isOwner,modo=t?"tuno":(me()?"otro":null);if(!modo||modo===privModo)return;privModo=modo;
+  privUnsubs.forEach(f=>{try{f()}catch(e){}});privUnsubs=[];
+  const mine=snap=>snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>(x.agrupacion||AGRUPACION)===AGRUPACION);
+  if(t)privUnsubs.push(fs.collection("parchesPriv").onSnapshot(snap=>{const m={};snap.docs.forEach(d=>m[d.id]=d.data());S.parchesPriv=m;mergeParches();render()},()=>{}));
+  else{S.parchesPriv={};mergeParches()}
+  privUnsubs.push((t?fs.collection("notasParche"):fs.collection("notasParche").where("lectores","array-contains",S.myId)).onSnapshot(snap=>{S.notasParche=mine(snap);render()},()=>{}));
+  unsubs.push(()=>{privUnsubs.forEach(f=>{try{f()}catch(e){}});privUnsubs=[];privModo=null})}
 function loadProfiles(){S.requests.forEach(r=>{S.profiles[r.id]={name:r.nombre||""}})}
 
 // ---------- render ----------
@@ -592,12 +611,12 @@ function parcheCard(p){const prog=esProgramado(p),n=att(p),yo=(p.asistentes||[])
   return `<button class="task" data-parche="${esc(p.id)}"><span class="stripe" style="background:var(--s-parche)"></span><span class="body">
     <span class="row"><span class="cat">${fmtDateDia(p.fecha)}${p.hora?" · "+esc(p.hora):""}</span>${ETAPA_PILL[etapaDe("parche",p)]||""}${miPill("parche",p)}</span>
     <h3>${esc(p.lugar||"Parche")}</h3>
-    <span class="meta"><span>${n} asistente${n===1?"":"s"}</span>${prog?"":`<span class="money">${clp(parcheNeto(p))} neto</span>${n?`<span>${clp(parcheNeto(p)/n)} c/u</span>`:""}`}</span></span></button>`}
+    <span class="meta"><span>${n} asistente${n===1?"":"s"}</span>${prog||!isTuno()?"":`<span class="money">${clp(parcheNeto(p))} neto</span>${n?`<span>${clp(parcheNeto(p)/n)} c/u</span>`:""}`}${(p.paradas||[]).length?`<span>${p.paradas.length} locales</span>`:""}</span></span></button>`}
 function contratoCard(c){const n=att(c),yo=(c.asistentes||[]).includes(S.myId);
   return `<button class="task" data-contrato="${esc(c.id)}"><span class="stripe" style="background:var(--s-contrato)"></span><span class="body">
     <span class="row"><span class="cat">${esc(c.tipo||"Otro")}</span>${ETAPA_PILL[etapaDe("contrato",c)]||""}${miPill("contrato",c)}</span>
     <h3>${esc(c.cliente||"Contrato")}</h3>
-    <span class="meta"><span>${fmtDateDia(c.fecha)}${c.hora?" · "+esc(c.hora):""}</span><span>${n} integrante${n===1?"":"s"}</span><span class="money">${clp(c.monto)}</span>${costosTotal(c)?`<span>Utilidad ${clp(contratoUtil(c))}</span>`:""}</span></span></button>`}
+    <span class="meta"><span>${fmtDateDia(c.fecha)}${c.hora?" · "+esc(c.hora):""}</span><span>${n} integrante${n===1?"":"s"}</span>${isTuno()?`<span class="money">${clp(c.monto)}</span>${costosTotal(c)?`<span>Utilidad ${clp(contratoUtil(c))}</span>`:""}`:""}</span></span></button>`}
 
 function viewParches(){
   if(!S.ready.p)return loadingHtml;
@@ -606,7 +625,8 @@ function viewParches(){
   const hechos=S.parches.filter(p=>!esProgramado(p)).sort((a,b)=>byFecha(b,a));
   const mesP=hechos.filter(p=>(p.fecha||"").startsWith(mes));const neto=sum(mesP,parcheNeto),a=sum(mesP,att);
   let h=`<div class="section-head"><h2>Parches</h2><span>${MESES_L[+mes.slice(5)-1]}</span></div>
-  <div class="summary"><div><b class="m">${clp(neto)}</b><span>neto del mes</span></div><div><b>${mesP.length}</b><span>parches del mes</span></div><div><b class="m">${a?clp(neto/a):"—"}</b><span>por asistente</span></div></div>`;
+  ${isTuno()?`<div class="summary"><div><b class="m">${clp(neto)}</b><span>neto del mes</span></div><div><b>${mesP.length}</b><span>parches del mes</span></div><div><b class="m">${a?clp(neto/a):"—"}</b><span>por asistente</span></div></div>`
+    :`<div class="summary"><div><b>${prox.length}</b><span>próximos</span></div><div><b>${mesP.length}</b><span>parches del mes</span></div><div><b>${a}</b><span>asistencias del mes</span></div></div>`}`;
   if(!S.parches.length)return h+`<div class="empty"><strong>Aún no hay parches</strong>${isOrg()?"Toca el botón dorado + para convocar un parche.":"Cuando se convoque un parche, aparecerá aquí para que respondas si vas."}</div>`;
   const porCerrar=hechos.filter(p=>etapaDe("parche",p)==="realizado"),hist=hechos.filter(p=>etapaDe("parche",p)!=="realizado");
   if(prox.length)h+=`<p class="group-label">Convocatorias y próximos</p><div class="list">${prox.map(parcheCard).join("")}</div>`;
@@ -621,7 +641,8 @@ function viewContratos(){
   const anio=S.contratos.filter(c=>(c.fecha||"").startsWith(y)&&(c.estado==="realizado"||c.estado==="pagado"));
   const porCobrar=sum(S.contratos.filter(c=>c.estado==="realizado"),c=>c.monto);
   let h=`<div class="section-head"><h2>Contratos</h2><span>${y}</span></div>
-  <div class="summary"><div><b class="m">${clp(sum(anio,contratoUtil))}</b><span>utilidad del año</span></div><div><b>${anio.length}</b><span>realizados</span></div><div class="${porCobrar?"alert":""}"><b class="m">${clp(porCobrar)}</b><span>por cobrar</span></div></div>`;
+  ${isTuno()?`<div class="summary"><div><b class="m">${clp(sum(anio,contratoUtil))}</b><span>utilidad del año</span></div><div><b>${anio.length}</b><span>realizados</span></div><div class="${porCobrar?"alert":""}"><b class="m">${clp(porCobrar)}</b><span>por cobrar</span></div></div>`
+    :`<div class="summary"><div><b>${prox.length}</b><span>próximos</span></div><div><b>${anio.length}</b><span>realizados en el año</span></div><div><b>${sum(anio,att)}</b><span>asistencias</span></div></div>`}`;
   if(!S.contratos.length)return h+`<div class="empty"><strong>Aún no hay contratos</strong>${isOrg()?"Toca el botón dorado + para registrar un contrato y convocar.":"Cuando se convoque un contrato, aparecerá aquí para que respondas si vas."}</div>`;
   const porCerrarC=resto.filter(c=>etapaDe("contrato",c)==="realizado"),histC=resto.filter(c=>etapaDe("contrato",c)!=="realizado");
   if(prox.length)h+=`<p class="group-label">Convocatorias y próximos</p><div class="list">${prox.map(contratoCard).join("")}</div>`;
@@ -645,13 +666,13 @@ function parcheForm(o){const p=o.id?S.parches.find(x=>x.id===o.id):null;
   ${!p||canEditEv("parche",p)?`<div class="field"><label for="pAdmin">Administrador del parche</label><select class="input" id="pAdmin">${Object.keys(S.members).filter(id=>["tuno","pardillo"].includes(grado(id))||id===S.myId).sort((a,b)=>nameOf(a).localeCompare(nameOf(b))).map(id=>`<option value="${esc(id)}" ${(p?adminDeParche(p):S.myId)===id?"selected":""}>${esc(nameOf(id))}${id===S.myId?" (tú)":""}</option>`).join("")}</select><span class="hint">Solo esta persona (y los administradores de la app) podrá editar el parche: locales, temas, veces por local, conteo y cierre.</span></div>`:""}
   <div class="field"><label for="pLugar">Zona o punto de encuentro</label><input type="text" id="pLugar" required maxlength="80" value="${esc(v.lugar)}" placeholder="Ej: Plaza de Armas de Talca"></div>
   <div class="two"><div class="field"><label for="pFechaP">Fecha</label><input type="date" id="pFechaP" required value="${esc(v.fecha)}"></div><div class="field"><label for="pHora">Hora</label><input type="time" id="pHora" value="${esc(v.hora)}"></div></div>
-  <div class="field"><label>Conteo del dinero (cantidad de cada uno)</label><span class="hint">Déjalo en blanco al convocar; se completa después del parche.</span>
+  ${isTuno()||S.isOwner?`<div class="field"><label>Conteo del dinero (cantidad de cada uno) · 🔒 solo tunos</label><span class="hint">Déjalo en blanco al convocar; se completa después del parche.</span>
     <div class="conteo">${DENOMS.map(d=>`<label class="den" for="den${d}"><span>${clp(d)}</span><input type="number" inputmode="numeric" min="0" step="1" data-den="${d}" id="den${d}" value="${+ct["d"+d]||""}" placeholder="0"></label>`).join("")}</div></div>
   <div class="two"><div class="field"><label for="pOtro">Otros / ajuste ($)</label><input type="number" inputmode="numeric" id="pOtro" value="${+v.otro||""}" placeholder="0"></div>
     <div class="field"><label for="pGastos">Gastos ($)</label><input type="number" inputmode="numeric" min="0" id="pGastos" value="${+v.gastos||""}" placeholder="0"></div></div>
   <div class="field"><label for="pGastosDet">Detalle de gastos</label><input type="text" id="pGastosDet" maxlength="80" value="${esc(v.gastosDetalle)}" placeholder="Ej: bebidas, estacionamiento"></div>
   <div class="live-total" id="pLive"></div>
-  <div class="field"><label for="pNotas">Notas</label><textarea id="pNotas" maxlength="500">${esc(v.notas)}</textarea></div>
+  <div class="field"><label for="pNotas">Notas internas · 🔒 solo tunos</label><textarea id="pNotas" maxlength="500">${esc(v.notas)}</textarea></div>`:""}
   <button class="btn primary" type="submit">${p?"Guardar cambios":"Registrar parche"}</button></form>`}
 const costoRow=c=>`<div class="costo-row"><input type="text" data-costo-concepto list="conceptos" maxlength="40" value="${esc((c||{}).concepto||"")}" placeholder="Concepto" aria-label="Concepto del costo"><input type="number" inputmode="numeric" min="0" data-costo-monto value="${(c||{}).monto||""}" placeholder="$" aria-label="Monto del costo"><button type="button" class="btn small" data-costo-del aria-label="Quitar costo">✕</button></div>`;
 function contratoForm(o){const c=o.id?S.contratos.find(x=>x.id===o.id):null;
@@ -772,6 +793,7 @@ function etapaActions(kind,e){const et=etapaDe(kind,e),id=esc(e.id),nom=KIND[kin
     <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:confirmado">Confirmar ${nom}</button><button class="btn small danger" data-etapa="${kind}:${id}:cancelado">Cancelar</button></div></div>`;
   if(et==="confirmado")return `<div class="block stage"><h4>Siguiente paso: realizarlo</h4><p class="muted-p">${kind==="parche"?"Durante el parche, registra cada local donde tocaron. ":kind==="presentacion"?"Define canciones y representantes para los concursos. ":""}Al terminar, márcalo como realizado.</p>
     <div class="btn-row" style="margin-top:10px"><button class="btn gold" data-etapa="${kind}:${id}:realizado">Marcar como realizado</button><button class="btn" data-wsp="${kind}:${id}">Avisar por WhatsApp</button><button class="btn small" data-etapa="${kind}:${id}:convocatoria">Volver a convocatoria</button></div></div>`;
+  if(kind==="parche"&&!(isTuno()||S.isOwner)&&["realizado","cerrado"].includes(et))return et==="realizado"?`<div class="callout info">El conteo del dinero, la bitácora y el reparto los registra un tuno.</div>`:"";
   if(et==="realizado")return `<div class="block stage"><h4>Siguiente paso: cierre</h4><p class="muted-p">${kind==="parche"?"Registra el conteo del dinero y luego la bitácora y el reparto.":kind==="contrato"?"Registra el pago y los costos, y luego la bitácora y el reparto.":"Registra la bitácora y los resultados."}</p>
     <div class="btn-row" style="margin-top:10px">${kind==="parche"?`<button class="btn" data-edit-parche="${id}">Registrar conteo</button>`:kind==="contrato"?`<button class="btn" data-edit-contrato="${id}">Pago y costos</button>`:""}<button class="btn gold" data-cierre="${kind}:${id}">${kind==="presentacion"?"Bitácora y cierre":"Bitácora y reparto"}</button></div></div>`;
   if(et==="cerrado")return `<div class="btn-row" style="margin-bottom:12px"><button class="btn small" data-cierre="${kind}:${id}">Editar cierre</button>${kind!=="presentacion"&&isTuno()&&e.reparto&&!e.repartoAprobado?`<button class="btn small gold" data-aprobar="${kind}:${id}">Aprobar reparto</button>`:""}</div>`;
@@ -804,11 +826,11 @@ function concursosBlock(e){const princ=(e.repertorio||[]).filter(s=>s.id&&s.grup
       :`<div class="rep-item"><span class="rep-t"><b>${l}</b></span><span class="rep-r">${x.cancion?esc((CANC[x.cancion]||{}).titulo||""):"—"} · ${x.rep?esc(nameOf(x.rep)):"sin representante"}</span></div>`}).join("")}
     ${ed&&!princ.length?`<p class="chart-note">Primero arma el repertorio con la estructura de presentación para elegir canciones del show principal.</p>`:""}</div>`}
 
-function cierreBlock(kind,e){const b=e.bitacora,R=e.reparto;if(!b&&!R)return"";
+function cierreBlock(kind,e){const b=e.bitacora,R=e.reparto;if(!b&&!R)return"";if(kind!=="presentacion"&&!isTuno())return"";
   let h=`<div class="block"><h4>Cierre y bitácora</h4>`;
   if(b){if(b.altos)h+=`<p class="rep-g">Puntos altos</p><p class="desc">${esc(b.altos)}</p>`;if(b.mejorar)h+=`<p class="rep-g">A mejorar</p><p class="desc">${esc(b.mejorar)}</p>`;
     if(b.resultados)h+=`<p class="rep-g">Resultados</p><p class="desc">${esc(b.resultados)}</p>`}
-  if(R&&kind!=="presentacion"){const ent=Object.entries(R).filter(([,v])=>+v>0);
+  if(R&&kind!=="presentacion"&&isTuno()){const ent=Object.entries(R).filter(([,v])=>+v>0);
     h+=`<p class="rep-g">Reparto ${e.repartoAprobado?'<span class="pill st-realizada">Aprobado</span>':'<span class="pill pl-pend">Por aprobar</span>'}</p>
     <div class="tbl-wrap"><table class="money-tbl"><tbody>${ent.map(([id,v])=>`<tr><td>${esc(nameOf(id))}</td><td class="num">${clp(v)}</td></tr>`).join("")}
     <tr class="sub"><td>Total repartido</td><td class="num">${clp(sum(ent,x=>x[1]))}</td></tr>${isTuno()?`<tr class="total"><td>Fondo para la Tuna</td><td class="num">${clp(e.fondoTuna||0)}</td></tr>`:""}</tbody></table></div>`}
@@ -841,7 +863,7 @@ function eventoDetail(kind,e){const et=etapaDe(kind,e);markSeen(e);let info="";
   const ek=kind==="presentacion"?"pres":kind;
   return `<h2>${esc(KIND[kind].title(e))}</h2>${stepper(et)}
   <div class="block"><dl class="kv">${info}</dl>${e.notas?`<p class="desc" style="margin-top:10px">${esc(e.notas)}</p>`:""}</div>
-  ${etapaActions(kind,e)}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+parcheMoney(e):""}${kind==="contrato"?contratoMoney(e):""}${cierreBlock(kind,e)}
+  ${etapaActions(kind,e)}${convBlock(kind,e)}${repBlock(kind,e)}${kind==="presentacion"?concursosBlock(e):""}${kind==="parche"?localesBlock(e)+(isTuno()?parcheMoney(e):""):""}${kind==="contrato"&&isTuno()?contratoMoney(e):""}${cierreBlock(kind,e)}${kind==="parche"&&etapaDe("parche",e)!=="convocatoria"?notasParcheBlock(e):""}
   ${canEditEv(kind,e)?`<div class="btn-row"><button class="btn" data-edit-${ek}="${esc(e.id)}">Editar datos</button>${(kind==="parche"?canEditEv(kind,e):isTuno())?`<button class="btn danger" data-del-${ek}="${esc(e.id)}">Eliminar</button>`:""}</div>`:""}`}
 
 function viewPresentaciones(){
@@ -908,6 +930,21 @@ function fondoKpi(P,C){const ev=[...P,...C].filter(e=>e.reparto&&etapaDe(e.clien
   if(Lc.length)h+=`<div class="block"><h4>Locales donde más se toca</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Local</th><th class="num">Parches</th><th class="num">Pasadas</th></tr></thead><tbody>${
     Lc.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.p.size}</td><td class="num">${r.v}</td></tr>`).join("")}</tbody></table></div></div>`;
   return h}
+
+// ---------- apreciaciones, comentarios y castigos del parche ----------
+const notasDe=pid=>S.notasParche.filter(n=>n.parche===pid).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+function notasParcheBlock(p){const L=notasDe(p.id),pid=esc(p.id);
+  const item=n=>`<div class="nota-p ${esc(n.tipo)}"><div class="who"><b>${esc(nameOf(n.autor))}</b> · ${fmtTs(n.fecha)}${n.tipo==="castigo"?` · para <b>${esc(nameOf(n.para))}</b>`:""}${isTuno()||(n.autor===S.myId&&n.tipo==="apreciacion")?`<button class="chip-x" data-del-notap="${esc(n.id)}" aria-label="Eliminar">✕</button>`:""}</div><p>${esc(n.texto)}</p></div>`;
+  if(isTuno()){const com=L.filter(n=>n.tipo==="comentario"),apr=L.filter(n=>n.tipo==="apreciacion"),cas=L.filter(n=>n.tipo==="castigo"),cand=vanIds(p).filter(id=>grado(id)!=="tuno");
+    return `<div class="block"><h4>🔒 Comentarios y observaciones · solo tunos</h4>${com.map(item).join("")||'<p class="muted-p">Sin comentarios todavía.</p>'}
+      <form class="f nota-form" data-notap="comentario:${pid}"><textarea id="npCom" maxlength="600" placeholder="Comentario u observación para los tunos" required></textarea><button class="btn small primary" type="submit">Agregar comentario</button></form></div>
+    <div class="block"><h4>Apreciaciones de pardillos y aspirantes · ${apr.length}</h4>${apr.map(item).join("")||'<p class="muted-p">Aún no dejan apreciaciones.</p>'}</div>
+    <div class="block"><h4>Castigos · ${cas.length}</h4><p class="chart-note" style="margin-top:0">Cada castigo solo lo ve la persona castigada y los tunos.</p>${cas.map(item).join("")}
+      ${cand.length?`<form class="f nota-form" data-notap="castigo:${pid}"><select class="input" id="npPara" aria-label="Para quién es el castigo">${cand.map(id=>`<option value="${esc(id)}">${esc(nameOf(id))} · ${GRADOS[grado(id)]}</option>`).join("")}</select><textarea id="npCas" maxlength="400" placeholder="Castigo y motivo" required></textarea><button class="btn small danger" type="submit">Asignar castigo</button></form>`:'<p class="muted-p">No hay pardillos ni aspirantes en este parche.</p>'}</div>`}
+  const mias=L.filter(n=>n.tipo==="apreciacion"&&n.autor===S.myId),cas=L.filter(n=>n.tipo==="castigo"&&n.para===S.myId);
+  return `${cas.length?`<div class="block castigo-b"><h4>Castigo para ti</h4>${cas.map(item).join("")}</div>`:""}
+  <div class="block"><h4>Mis apreciaciones</h4><p class="chart-note" style="margin-top:0">Lo que escribas aquí solo lo verán los tunos.</p>${mias.map(item).join("")}
+    <form class="f nota-form" data-notap="apreciacion:${pid}"><textarea id="npApr" maxlength="600" placeholder="¿Qué te pareció el parche? ¿Qué mejorarías?" required></textarea><button class="btn small primary" type="submit">Enviar apreciación</button></form></div>`}
 
 // ---------- caja de la Tuna ----------
 const CAT_CAJA={ingreso:["Cuotas","Donación","Venta","Saldo inicial","Otro ingreso"],egreso:["Cuerdas e instrumentos","Vestuario","Viajes y certámenes","Transporte","Alimentación","Otro gasto"]};
@@ -998,7 +1035,9 @@ function viewKpi(){
   if(!P.length&&!C.length)return h+`<div class="empty"><strong>Sin parches ni contratos en este período</strong>Los indicadores se calculan con los parches ya contados y los contratos realizados o pagados. Registra uno en Parches o Contratos y aparecerán aquí.</div>`+ck+tk+exportBlock();
   const netoP=sum(P,parcheNeto),cobr=sum(C,c=>c.monto),cost=sum(C,costosTotal),utilC=cobr-cost,attP=sum(P,att),attC=sum(C,att),nEv=P.length+C.length;
   const mids=Object.keys(S.members),uniq=new Set([...P,...C].flatMap(e=>e.asistentes||[]).filter(id=>S.members[id]));
-  h+=`<div class="kpis">
+  if(!isTuno()){h+=`<div class="kpis"><div class="kpi"><span>Parches</span><b>${P.length}</b><small>${attP} asistencias</small></div><div class="kpi"><span>Contratos</span><b>${C.length}</b><small>${attC} asistencias</small></div>
+      <div class="kpi"><span>Integrantes por evento</span><b>${fmtCount((attP+attC)/nEv)}</b><small>asistencia promedio</small></div><div class="kpi"><span>Participaron</span><b>${uniq.size} de ${mids.length}</b><small>${mids.length?Math.round(uniq.size/mids.length*100):0}% de la Tuna</small></div></div>`}
+  else h+=`<div class="kpis">
     <div class="kpi hero"><span>Total generado en el período</span><b>${clp(netoP+utilC)}</b><small>Parches ${clp(netoP)} · Contratos ${clp(utilC)}</small></div>
     <div class="kpi"><span>Parches</span><b>${P.length}</b><small>${P.length?clp(netoP/P.length)+" neto promedio":"—"}</small></div>
     <div class="kpi"><span>Por asistente en parche</span><b>${attP?clp(netoP/attP):"—"}</b><small>${attP} asistencias</small></div>
@@ -1012,11 +1051,11 @@ function viewKpi(){
   const inM=(a,k)=>a.filter(e=>(e.fecha||"").startsWith(k)),ml=k=>MESES_L[+k.slice(5)-1]+" "+k.slice(0,4);
   const sP={name:"Parches (neto)",color:"var(--s-parche)",values:mk.map(k=>sum(inM(P,k),parcheNeto))};
   const sC={name:"Contratos (utilidad)",color:"var(--s-contrato)",values:mk.map(k=>sum(inM(C,k),contratoUtil))};
-  h+=chartBlock("Flujo de dinero por mes",[sP,sC],barsChart(lab,[sP,sC],fmtMoneyShort,i=>`${ml(mk[i])}\nParches: ${clp(sP.values[i])} (${inM(P,mk[i]).length})\nContratos: ${clp(sC.values[i])} (${inM(C,mk[i]).length})`));
+  if(isTuno())h+=chartBlock("Flujo de dinero por mes",[sP,sC],barsChart(lab,[sP,sC],fmtMoneyShort,i=>`${ml(mk[i])}\nParches: ${clp(sP.values[i])} (${inM(P,mk[i]).length})\nContratos: ${clp(sC.values[i])} (${inM(C,mk[i]).length})`));
   const lP={name:"Parches",color:"var(--s-parche)",values:mk.map(k=>sum(inM(P,k),att))},lC={name:"Contratos",color:"var(--s-contrato)",values:mk.map(k=>sum(inM(C,k),att))};
   h+=chartBlock("Flujo de participantes por mes",[lP,lC],lineChart(lab,[lP,lC],fmtCount,i=>{const a=inM(P,mk[i]),b=inM(C,mk[i]);
     return `${ml(mk[i])}\nParches: ${lP.values[i]} asistencias en ${a.length}\nContratos: ${lC.values[i]} asistencias en ${b.length}`}),"Suma de los asistentes de cada evento del mes.");
-  if(P.length){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
+  if(P.length&&isTuno()){const lp=P.slice().sort(byFecha).slice(-12),s={name:"Neto",color:"var(--s-parche)",values:lp.map(parcheNeto)};
     h+=chartBlock("Recaudación por parche"+(P.length>12?" · últimos 12":""),null,barsChart(lp.map(p=>+p.fecha.slice(8)+"/"+(+p.fecha.slice(5,7))),[s],fmtMoneyShort,
       i=>{const p=lp[i],n=att(p);return `${p.lugar||"Parche"} · ${fmtDate(p.fecha)}\nNeto: ${clp(parcheNeto(p))}\n${n} asistente${n===1?"":"s"}${n?" · "+clp(parcheNeto(p)/n)+" c/u":""}`}),"Monto neto de cada parche, en orden de fecha.")}
   h+=ck+fondoKpi(P,C);
@@ -1029,11 +1068,11 @@ function viewKpi(){
   h+=`<div class="block"><h4>Participación por grado</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Grado</th><th class="num">Integrantes</th><th class="num">Activos</th><th class="num">Asistencias</th><th class="num">Promedio</th></tr></thead><tbody>${
     ["tuno","pardillo","aspirante"].map(g=>{const r=rows.filter(x=>grado(x.id)===g),part=sum(r,x=>x.p+x.c);
       return `<tr><td>${GRADOS[g]}s</td><td class="num">${r.length}</td><td class="num">${r.filter(x=>x.p+x.c).length}</td><td class="num">${part}</td><td class="num">${r.length?fmtCount(part/r.length):"—"}</td></tr>`}).join("")}</tbody></table></div></div>`;
-  if(P.length){const g={};P.forEach(p=>{const k=(p.lugar||"Sin lugar").trim().toLowerCase();(g[k]=g[k]||{n:(p.lugar||"Sin lugar").trim(),l:[]}).l.push(p)});
+  if(P.length&&isTuno()){const g={};P.forEach(p=>{const k=(p.lugar||"Sin lugar").trim().toLowerCase();(g[k]=g[k]||{n:(p.lugar||"Sin lugar").trim(),l:[]}).l.push(p)});
     const lr=Object.values(g).map(x=>{const a=sum(x.l,att),n=sum(x.l,parcheNeto);return {n:x.n,c:x.l.length,avg:n/x.l.length,pa:a?n/a:0}}).sort((a,b)=>b.avg-a.avg).slice(0,8);
     h+=`<div class="block"><h4>Lugares de parche</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Lugar</th><th class="num">Parches</th><th class="num">Neto prom.</th><th class="num">C/u</th></tr></thead><tbody>${
       lr.map(r=>`<tr><td>${esc(r.n)}</td><td class="num">${r.c}</td><td class="num">${clp(r.avg)}</td><td class="num">${r.pa?clp(r.pa):"—"}</td></tr>`).join("")}</tbody></table></div><p class="chart-note">Ordenados por recaudación neta promedio.</p></div>`}
-  if(C.length){const g={};C.forEach(c=>{(g[c.tipo||"Otro"]=g[c.tipo||"Otro"]||[]).push(c)});
+  if(C.length&&isTuno()){const g={};C.forEach(c=>{(g[c.tipo||"Otro"]=g[c.tipo||"Otro"]||[]).push(c)});
     const tr=Object.entries(g).map(([t,l])=>{const m=sum(l,c=>c.monto),u=sum(l,contratoUtil);return {t,c:l.length,m,u}}).sort((a,b)=>b.u-a.u);
     h+=`<div class="block"><h4>Contratos por tipo</h4><div class="tbl-wrap"><table class="kt"><thead><tr><th>Tipo</th><th class="num">N°</th><th class="num">Cobrado</th><th class="num">Utilidad</th><th class="num">Margen</th></tr></thead><tbody>${
       tr.map(r=>`<tr><td>${esc(r.t)}</td><td class="num">${r.c}</td><td class="num">${clp(r.m)}</td><td class="num">${clp(r.u)}</td><td class="num">${r.m?Math.round(r.u/r.m*100)+"%":"—"}</td></tr>`).join("")}</tbody></table></div></div>`}
@@ -1324,6 +1363,10 @@ function note(autor,texto,tipo){return {id:uid(),autor,texto,tipo:tipo||"nota",f
 
 document.addEventListener("submit",async e=>{
   const f=e.target;e.preventDefault();
+  if(f.dataset&&f.dataset.notap){const [tipo,pid]=f.dataset.notap.split(":"),ta=f.querySelector("textarea"),txt=ta.value.trim();if(!txt)return;
+    const d={parche:pid,tipo,texto:txt,autor:S.myId,fecha:new Date().toISOString(),agrupacion:AGRUPACION};
+    if(tipo==="apreciacion")d.lectores=[S.myId];else if(tipo==="castigo"){d.para=f.querySelector("select").value;d.lectores=[d.para]}else d.lectores=[];
+    ta.value="";await safe(()=>S.db.doc("notasParche/"+uid()).set(d),{apreciacion:"Apreciación enviada a los tunos",castigo:"Castigo asignado",comentario:"Comentario agregado"}[tipo]);return}
   if(f.id==="ownerForm"){const ap=$("#ownApodo").value.trim();if(!ap)return;
     await safe(()=>S.db.doc("miembros/"+S.myId).set({apodo:ap,grado:"tuno",agrupacion:AGRUPACION,desde:new Date().toISOString(),admin:true}),"Listo, ya eres parte del planificador")}
   if(f.id==="joinForm"){const ap=$("#joinApodo").value.trim();if(!ap)return;
@@ -1361,13 +1404,14 @@ document.addEventListener("submit",async e=>{
     closeSheet()}
   if(f.id==="parcheForm"){const o=S.sheet;const conteo={};
     f.querySelectorAll("[data-den]").forEach(i=>{const n=Math.max(0,Math.floor(+i.value||0));if(n)conteo["d"+i.dataset.den]=n});
-    const data={lugar:$("#pLugar").value.trim(),fecha:$("#pFechaP").value,hora:$("#pHora").value,conteo,otro:Math.round(+$("#pOtro").value||0),
-      gastos:Math.max(0,Math.round(+$("#pGastos").value||0)),gastosDetalle:$("#pGastosDet").value.trim(),
-      notas:$("#pNotas").value.trim()};
+    const data={lugar:$("#pLugar").value.trim(),fecha:$("#pFechaP").value,hora:$("#pHora").value};
     if($("#pAdmin"))data.adminParche=$("#pAdmin").value;
-    data.total=parcheTotal(data);data.neto=data.total-data.gastos;
-    if(o.id){await safe(()=>S.db.doc("parches/"+o.id).update({...data,actualizado:new Date().toISOString()}),"Parche guardado");openSheet({type:"parche",id:o.id})}
-    else{const id=uid();await safe(()=>S.db.doc("parches/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()}),"Parche convocado");openSheet({type:"parche",id})}}
+    let priv=null;if($("#pOtro")){priv={conteo,otro:Math.round(+$("#pOtro").value||0),gastos:Math.max(0,Math.round(+$("#pGastos").value||0)),gastosDetalle:$("#pGastosDet").value.trim(),notas:$("#pNotas").value.trim(),agrupacion:AGRUPACION};
+      priv.total=parcheTotal(priv);priv.neto=priv.total-priv.gastos}
+    const id=o.id||uid();
+    await safe(async()=>{if(o.id)await S.db.doc("parches/"+id).update({...data,actualizado:new Date().toISOString()});
+      else await S.db.doc("parches/"+id).set({...data,etapa:"convocatoria",convocados:{},asistentes:[],creadoPor:S.myId,agrupacion:AGRUPACION,creado:new Date().toISOString()});
+      if(priv)await privWrite(id,priv)},o.id?"Parche guardado":"Parche convocado");openSheet({type:"parche",id})}
   if(f.id==="contratoForm"){const o=S.sheet;
     const costos=[...f.querySelectorAll(".costo-row")].map(r=>({concepto:r.querySelector("[data-costo-concepto]").value.trim(),monto:Math.max(0,Math.round(+r.querySelector("[data-costo-monto]").value||0))})).filter(x=>x.concepto||x.monto);
     const data={cliente:$("#cCliente").value.trim(),tipo:$("#cTipo").value,estado:$("#cEstado").value,fecha:$("#cFecha").value,hora:$("#cHora").value,
@@ -1388,7 +1432,11 @@ document.addEventListener("submit",async e=>{
       Object.assign(upd,{reparto:R,fondoTuna:neto-rep,fondoPct:Math.round(+(($("#fondoPct")||{}).value)||0)});
       if(isTuno())upd.repartoAprobado=true;
       if(k==="contrato")upd.estado=$("#pagoOk")&&$("#pagoOk").checked?"pagado":"realizado"}
-    await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");openSheet({type:k,id:o.id});return}
+    if(k==="parche"){const base={etapa:upd.etapa,cerradoEn:upd.cerradoEn,cerradoPor:upd.cerradoPor},priv={};
+      ["bitacora","reparto","fondoTuna","fondoPct","repartoAprobado"].forEach(x=>{if(upd[x]!==undefined)priv[x]=upd[x]});priv.agrupacion=AGRUPACION;
+      await safe(async()=>{await privWrite(o.id,priv);await S.db.doc("parches/"+o.id).update(base)},"Parche cerrado")}
+    else await safe(()=>S.db.doc(KIND[k].col+"/"+o.id).update(upd),"Evento cerrado");
+    openSheet({type:k,id:o.id});return}
   if(f.id==="localForm"){const pid=S.sheet&&S.sheet.id,nom=$("#lcNombre").value.trim();if(!pid||!nom)return;
     const x={local:nom,veces:Math.max(1,Math.round(+$("#lcVeces").value||1)),nota:$("#lcNota").value.trim(),at:new Date().toISOString(),por:S.myId};
     $("#lcNombre").value="";$("#lcNota").value="";$("#lcVeces").value="1";
@@ -1468,7 +1516,9 @@ document.addEventListener("click",async e=>{
     await setEtapa(k,id,et);return}
   if(ds.wsp){const [k,id]=ds.wsp.split(":"),ev=KIND[k].arr().find(x=>x.id===id);if(!ev)return;window.open("https://wa.me/?text="+encodeURIComponent(wspText(k,ev)),"_blank");return}
   if(ds.cierre){const [k,id]=ds.cierre.split(":");openSheet({type:"cierreForm",kind:k,id});return}
-  if(ds.aprobar){const [k,id]=ds.aprobar.split(":");await safe(()=>S.db.doc(KIND[k].col+"/"+id).update({repartoAprobado:true,aprobadoPor:S.myId}),"Reparto aprobado");return}
+  if(ds.aprobar){const [k,id]=ds.aprobar.split(":"),d={repartoAprobado:true,aprobadoPor:S.myId};
+    await safe(()=>k==="parche"?privWrite(id,d):S.db.doc(KIND[k].col+"/"+id).update(d),"Reparto aprobado");return}
+  if(ds.delNotap){const id=ds.delNotap;await safe(()=>S.db.doc("notasParche/"+id).delete(),"Eliminado");return}
   if(ds.veces){const [id,i,d]=ds.veces.split(":"),p=S.parches.find(x=>x.id===id);if(!p)return;
     const L2=(p.paradas||[]).map((x,j)=>j===+i?{...x,veces:Math.max(1,Math.min(20,(x.veces||1)+(+d)))}:x);
     await safe(()=>S.db.doc("parches/"+id).update({paradas:L2}));return}
